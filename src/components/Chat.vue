@@ -10,13 +10,12 @@
             <input type="text" id="accountName" v-model="accountName" />
         </div>
         <div>
-            <label for="question">Question:</label>
             <Textarea id="question" v-model="question" :rows="5" />
-            <Button label="Ask" @click="ask" :disabled="isLoading" />
+
         </div>
         <div>
-            <label for="answer">Answer:</label>
             <Textarea id="answer" v-model="answer" readonly :rows="10" />
+            <Slider v-model="rate" class="w-full" />
         </div>
         <div>
             <div>
@@ -25,7 +24,7 @@
             </div>
             <Button :label="recordButtonLabel" @click="toggleRecording" :disabled="isVoiceDisabled" />
             <Button :label="speaking ? 'Stop Speaking' : 'Speak'" @click="toggleSpeaking" :disabled="isVoiceDisabled" />
-            <Slider v-model="rate" class="w-full" />
+            <Button label="Ask" @click="ask" :disabled="isLoading" />
         </div>
     </div>
 </template>
