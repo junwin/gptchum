@@ -1,6 +1,6 @@
 import { createApp } from 'vue'
 import App from './App.vue'
-
+import { router } from './router'
 import './assets/main.css'
 import PrimeVue from 'primevue/config'
 import InputText from 'primevue/inputtext'
@@ -45,5 +45,6 @@ app.component('Column', Column);
 app.component('Chip', Chip);
 const pinia = createPinia()
 app.use(pinia)
+app.use(router)
 
 app.mount('#app')

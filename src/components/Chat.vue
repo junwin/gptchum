@@ -22,7 +22,7 @@
             <Textarea id="question" v-model="question" :rows="5" :spellcheck="spellcheck" :lang="language" class="w-full" />
         </div>
         <div>
-            <Textarea id="answer" v-model="answer"  :rows="10" :spellcheck="spellcheck" :lang="language" class="w-full" />
+            <Textarea id="answer" v-model="answer" :rows="10" :spellcheck="spellcheck" :lang="language" class="w-full" />
             <Slider v-model="rate" class="w-full" />
         </div>
         <div>
@@ -70,17 +70,33 @@ export default {
             language: "es-ES",
             spellcheck: "false",
             dataService: null,
+            store: null,
         };
     },
     mounted() {
         this.store = useSettingStore();
         this.dataService = this.store.dataService;
+        this.selectedAgent = this.store.getAgentName;
+        this.accountName = this.store.getAccountName;
         this.populateVoiceList();
         this.fetchAgentNames();
         this.conversationId = Date.now().toString();
         if (speechSynthesis.onvoiceschanged !== undefined) {
             speechSynthesis.onvoiceschanged = this.populateVoiceList;
         }
+    },
+    watch: {
+        selectedAgent(newAgentName) {
+            //this.store = useSettingStore();
+            this.store.agentName = newAgentName;
+            //this.selectedAgent = newAgentName;
+        },
+        accountName(newAccountName) {
+            //this.store = useSettingStore();
+            this.store.accountName = newAccountName;
+            //this.store.setAccountName(newAccountName);
+            //this.accountName = newAccountName;
+        },
     },
     computed: {
         isVoiceDisabled() {

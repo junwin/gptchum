@@ -33,58 +33,94 @@ class DataService {
     }
   }
 
-  getPrompts(agentName, accountName, conversationId) {
-    return this.apiClient.get("/prompts", {
-      params: {
-        agentName,
-        accountName,
-        conversationId,
-      },
-    });
+  async getPrompts(agentName, accountName, conversationId) {
+    try {
+      const response = await this.apiClient.get("/prompts", {
+        params: {
+          agentName,
+          accountName,
+          conversationId,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
   }
 
-  updatePrompt(agentName, accountName, id, prompt) {
-    return this.apiClient.put("/prompts", prompt, {
-      params: {
-        agentName,
-        accountName,
-        id,
-      },
-    });
+  async updatePrompt(agentName, accountName, id, prompt) {
+    try {
+      const response = await this.apiClient.put("/prompts", prompt, {
+        params: {
+          agentName,
+          accountName,
+          id,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
   }
 
-  deletePrompt(agentName, accountName, id) {
-    return this.apiClient.delete("/prompts", {
-      params: {
-        agentName,
-        accountName,
-        id,
-      },
-    });
+  async deletePrompt(agentName, accountName, id) {
+    try {
+      const response = await this.apiClient.delete("/prompts", {
+        params: {
+          agentName,
+          accountName,
+          id,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
   }
 
-  getConversationIds(agentName, accountName) {
-    return this.apiClient.get("/conversationIds", {
-      params: {
-        agentName,
-        accountName,
-      },
-    });
+  async getConversationIds(agentName, accountName) {
+    try {
+      const response = await this.apiClient.get("/conversationIds", {
+        params: {
+          agentName,
+          accountName,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
   }
 
-  renameConversationId(agentName, accountName, existingId, newId) {
-    return this.apiClient.put("/conversationIds", null, {
-      params: {
-        agentName,
-        accountName,
-        existingId,
-        newId,
-      },
-    });
+  async renameConversationId(agentName, accountName, existingId, newId) {
+    try {
+      const response = await this.apiClient.put("/conversationIds", null, {
+        params: {
+          agentName,
+          accountName,
+          existingId,
+          newId,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
   }
 
-  computeConversations(data) {
-    return this.apiClient.post("/computeConversations", data);
+  async computeConversations(data) {
+    try {
+      const response = await this.apiClient.post("/computeConversations", data);
+      return response.data;
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
   }
 }
 

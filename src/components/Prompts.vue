@@ -45,9 +45,9 @@
                     </li>
                 </ol>
                 <h3>Keywords</h3>
-                <ChipGroup>
+           
                     <Chip v-for="(keyword, index) in selectedPrompt.keywords" :key="index">{{ keyword }}</Chip>
-                </ChipGroup>
+        
             </div>
             <template #footer>
                 <Button label="Save" @click="updatePrompt" />
@@ -82,15 +82,21 @@ export default {
     },
     watch: {
         selectedAgent() {
+            //this.store.setAgentName(newAgentName);
+            this.store.agentName = newAgentName;
             this.fetchConversationIds();
         },
         accountName() {
+            //this.store.setAccountName(newAccountName);
+            this.store.accountName = newAccountName;
             this.fetchConversationIds();
         },
     },
     mounted() {
         this.store = useSettingStore();
         this.dataService = this.store.dataService;
+        this.selectedAgent = this.store.getAgentName;
+        this.accountName = this.store.getAccountName;
         this.fetchAgentNames();
         this.fetchConversationIds();
         //this.conversationId = Date.now().toString();
@@ -108,7 +114,7 @@ export default {
         async fetchConversationIds() {
             try {
                 const response = await this.dataService.getConversationIds(this.selectedAgent.name, this.accountName);
-                this.conversationIds = response.data;
+                this.conversationIds = response;
                 this.selectedConversationId = this.conversationIds.length > 0 ? this.conversationIds[0] : null;
             } catch (error) {
                 console.error(error);
@@ -122,7 +128,7 @@ export default {
                     this.accountName,
                     this.selectedConversationId
                 );
-                this.prompts = prompts.data;
+                this.prompts = prompts;
             } catch (error) {
                 console.error("Error fetching prompts:", error);
             } finally {
