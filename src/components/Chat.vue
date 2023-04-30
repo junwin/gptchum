@@ -1,45 +1,60 @@
 <template>
     <div style="width: 100%; height: 100%">
         <h1>AI Assistant</h1>
-        <div>
-            <label for="agentName">Agent Name:</label>
-            <input type="text" id="agentName" v-model="agentName" />
-        </div>
-        <div>
-            <label for="accountName">Account Name:</label>
-            <input type="text" id="accountName" v-model="accountName" />
-        </div>
-        <div>
-            <Textarea id="question" v-model="question" :rows="5" />
+        <Toolbar style="width: 100%">
+            <template #start>
+                <div>
+                    <label for="agentDropdown">Agent Name:</label>
+                    <Dropdown id="agentDropdown" v-model="selectedAgent" :options="agents" optionLabel="name" />
+                </div>
+                <div>
+                    <label for="accountName">Account Name:</label>
+                    <input type="text" id="accountName" v-model="accountName" />
+                </div>
+                <div>
+                    <label for="selectType">Account Name:</label>
+                    <input type="text" id="selectType" v-model="selectType" />
+                </div>
+            </template>
+        </Toolbar>
 
+        <div>
+            <Textarea id="question" v-model="question" :rows="5" :spellcheck="spellcheck" :lang="language" class="w-full" />
         </div>
         <div>
-            <Textarea id="answer" v-model="answer" readonly :rows="10" />
+            <Textarea id="answer" v-model="answer"  :rows="10" :spellcheck="spellcheck" :lang="language" class="w-full" />
             <Slider v-model="rate" class="w-full" />
         </div>
         <div>
-            <div>
-                <label>Voices:</label>
-                <Dropdown v-model="selectedVoice" :options="voices" optionLabel="name" />
-            </div>
-            <Button :label="recordButtonLabel" @click="toggleRecording" :disabled="isVoiceDisabled" />
-            <Button :label="speaking ? 'Stop Speaking' : 'Speak'" @click="toggleSpeaking" :disabled="isVoiceDisabled" />
-            <Button label="Ask" @click="ask" :disabled="isLoading" />
+
+            <Toolbar style="width: 100%">
+                <template #start>
+                    <Button :label="recordButtonLabel" @click="toggleRecording" :disabled="isVoiceDisabled" />
+                    <Button :label="speaking ? 'Stop Speaking' : 'Speak'" @click="toggleSpeaking"
+                        :disabled="isVoiceDisabled" />
+                    <Button label="Ask" @click="ask" :disabled="isLoading" />
+                    <Dropdown v-model="selectedVoice" :options="voices" optionLabel="name" />
+                </template>
+            </Toolbar>
         </div>
     </div>
 </template>
+
   
   
   
 <script>
 import DataService from "../DataService";
+import { useSettingStore } from "../stores/SettingStore.js";
 
 export default {
     components: {},
     name: "Chat",
     data() {
         return {
-            agentName: "",
+            agents: [],
+            selectedAgent: "",
+            //agentName: "",
             accountName: "",
             question: "",
             answer: "",
@@ -50,10 +65,19 @@ export default {
             rate: 50,
             isLoading: false,
             speaking: false,
+            conversationId: "none",
+            selectType: "",
+            language: "es-ES",
+            spellcheck: "false",
+            dataService: null,
         };
     },
     mounted() {
+        this.store = useSettingStore();
+        this.dataService = this.store.dataService;
         this.populateVoiceList();
+        this.fetchAgentNames();
+        this.conversationId = Date.now().toString();
         if (speechSynthesis.onvoiceschanged !== undefined) {
             speechSynthesis.onvoiceschanged = this.populateVoiceList;
         }
@@ -84,10 +108,12 @@ export default {
         async ask() {
             this.isLoading = true;
             try {
-                const response = await DataService.askQuestion(
+                const response = await this.dataService.askQuestion(
                     this.question,
-                    this.agentName,
-                    this.accountName
+                    this.selectedAgent.name,
+                    this.accountName,
+                    this.conversationId,
+                    this.selectType
                 );
                 this.answer = response.response;
             } catch (error) {
@@ -95,7 +121,14 @@ export default {
             }
             this.isLoading = false;
         },
-
+        async fetchAgentNames() {
+            try {
+                const agentNames = await this.dataService.getAgentNames();
+                this.agents = agentNames.map(agentName => ({ name: agentName }));
+            } catch (error) {
+                console.error("Error fetching agent names:", error);
+            }
+        },
         toggleRecording() {
             if (this.isRecording) {
                 this.stopRecording();
