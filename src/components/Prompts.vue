@@ -45,9 +45,9 @@
                     </li>
                 </ol>
                 <h3>Keywords</h3>
-           
-                    <Chip v-for="(keyword, index) in selectedPrompt.keywords" :key="index">{{ keyword }}</Chip>
-        
+
+                <Chip v-for="(keyword, index) in selectedPrompt.keywords" :key="index">{{ keyword }}</Chip>
+
             </div>
             <template #footer>
                 <Button label="Save" @click="updatePrompt" />
@@ -82,14 +82,20 @@ export default {
     },
     watch: {
         selectedAgent() {
-            //this.store.setAgentName(newAgentName);
-            this.store.agentName = newAgentName;
-            this.fetchConversationIds();
+            try {
+                this.store.agentName = newAgentName;
+                this.fetchConversationIds();
+            } catch (error) {
+                console.error(error);
+            }
         },
         accountName() {
-            //this.store.setAccountName(newAccountName);
-            this.store.accountName = newAccountName;
-            this.fetchConversationIds();
+            try {
+                this.store.accountName = newAccountName;
+                this.fetchConversationIds();
+            } catch (error) {
+                console.error(error);
+            }
         },
     },
     mounted() {
