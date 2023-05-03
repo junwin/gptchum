@@ -15,6 +15,10 @@
                     <label for="selectType">Account Name:</label>
                     <input type="text" id="selectType" v-model="selectType" />
                 </div>
+                <div>
+                    <label for="conversationId">Conv Id:</label>
+                    <input type="text" id="convId" v-model="conversationId" />
+                </div>
             </template>
         </Toolbar>
 
@@ -65,7 +69,7 @@ export default {
             rate: 50,
             isLoading: false,
             speaking: false,
-            conversationId: "none",
+            conversationId: this.getCurrentDateYYYYMMDD(),
             selectType: "",
             language: "es-ES",
             spellcheck: "false",
@@ -80,7 +84,7 @@ export default {
         this.accountName = this.store.getAccountName;
         this.populateVoiceList();
         this.fetchAgentNames();
-        this.conversationId = Date.now().toString();
+        this.conversationId = this.getCurrentDateYYYYMMDD();
         if (speechSynthesis.onvoiceschanged !== undefined) {
             speechSynthesis.onvoiceschanged = this.populateVoiceList;
         }
@@ -136,6 +140,14 @@ export default {
                 this.answer = "Error occurred while processing the question.";
             }
             this.isLoading = false;
+        },
+        getCurrentDateYYYYMMDD() {
+            const date = new Date();
+            const year = date.getFullYear();
+            const month = ('0' + (date.getMonth() + 1)).slice(-2); // Add 1 to month because it is 0-indexed
+            const day = ('0' + date.getDate()).slice(-2);
+
+            return `${year}${month}${day}`;
         },
         async fetchAgentNames() {
             try {

@@ -41,7 +41,8 @@
                 <h3>Conversation</h3>
                 <ol>
                     <li v-for="(entry, index) in selectedPrompt.conversation" :key="index">
-                        <b>{{ entry.role }}:</b> {{ entry.content }}
+                        <b>{{ entry.role }}:</b>
+                        <textarea v-model="entry.content" rows="3" style="width: 100%; resize: vertical;"></textarea>
                     </li>
                 </ol>
                 <h3>Keywords</h3>
@@ -53,7 +54,7 @@
                 <Button label="Save" @click="updatePrompt" />
                 <Button label="Cancel" @click="closeEditPromptDialog" />
             </template>
-        </Dialog>
+        </Dialog>>
     </div>
 </template>
   
@@ -155,7 +156,7 @@ export default {
         async updatePrompt() {
             try {
                 await this.dataService.updatePrompt(
-                    this.selectedAgent,
+                    this.selectedAgent.name,
                     this.accountName,
                     this.selectedPrompt.id,
                     this.selectedPrompt
@@ -170,7 +171,7 @@ export default {
 
         async deletePrompt(id) {
             try {
-                await this.dataService.deletePrompt(this.selectedAgent, this.accountName, id);
+                await this.dataService.deletePrompt(this.selectedAgent.name, this.accountName, id);
                 this.fetchPrompts();
             } catch (error) {
                 console.error("Error deleting prompt:", error);
