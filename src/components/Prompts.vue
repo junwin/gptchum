@@ -42,7 +42,7 @@
                 <ol>
                     <li v-for="(entry, index) in selectedPrompt.conversation" :key="index">
                         <b>{{ entry.role }}:</b>
-                        <textarea v-model="entry.content" rows="3" style="width: 100%; resize: vertical;"></textarea>
+                        <Textarea id="entry.role" v-model="entry.content" :rows="5" class="w-full" />
                     </li>
                 </ol>
                 <h3>Keywords</h3>

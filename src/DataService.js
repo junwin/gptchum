@@ -25,7 +25,7 @@ class DataService {
     try {
       const response = await this.apiClient.get("/agents");
       const agents = response.data;
-      const agentNames = agents.map(agent => agent.agentName);
+      const agentNames = agents.map(agent => agent.name);
       return agentNames;
     } catch (error) {
       console.error(error);

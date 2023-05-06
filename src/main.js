@@ -14,7 +14,6 @@ import Slider from 'primevue/slider';
 import Textarea from 'primevue/textarea';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
-//import ChipGroup from 'primevue/chipgroup';
 import Chip from 'primevue/chip'
 import { createPinia } from 'pinia'
 
@@ -41,7 +40,6 @@ app.component('Slider', Slider);
 app.component('ProgressSpinner', ProgressSpinner);
 app.component('DataTable', DataTable);
 app.component('Column', Column);
-//app.component('ChipGroup', ChipGroup);
 app.component('Chip', Chip);
 const pinia = createPinia()
 app.use(pinia)

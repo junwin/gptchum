@@ -1,6 +1,6 @@
 <template>
   <div class="card">
-    <h5>Default</h5>
+    <h1>AI Assistant</h1>
     <TabMenu :model="items" />
     <router-view />
   </div>
@@ -10,13 +10,10 @@
 import Chat from "./components/Chat.vue";
 import Prompts from "./components/Prompts.vue";
 
-
-
 export default {
   components: {
     Chat,
     Prompts,
-
   },
   data() {
     return {
@@ -35,11 +32,15 @@ export default {
       ],
     };
   },
-  methods: {
-
-  },
+  methods: {},
 };
 </script>
 
-
-
+<style scoped>
+.card {
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+</style>
