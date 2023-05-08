@@ -13,9 +13,12 @@ import ProgressSpinner from 'primevue/progressspinner';
 import Slider from 'primevue/slider';
 import Textarea from 'primevue/textarea';
 import DataTable from 'primevue/datatable';
+import VirtualScroller from 'primevue/virtualscroller';
 import Column from 'primevue/column';
 import Chip from 'primevue/chip'
 import { createPinia } from 'pinia'
+import InteractiveConversation from './components/InteractiveConversation.vue';
+
 
 
 
@@ -41,6 +44,8 @@ app.component('ProgressSpinner', ProgressSpinner);
 app.component('DataTable', DataTable);
 app.component('Column', Column);
 app.component('Chip', Chip);
+app.component('VirtualScroller', VirtualScroller);
+app.component('InteractiveConversation', InteractiveConversation);
 const pinia = createPinia()
 app.use(pinia)
 app.use(router)

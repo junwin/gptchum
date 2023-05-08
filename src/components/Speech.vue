@@ -16,7 +16,6 @@ export default {
         voicesZ: Array,
         selectedVoiceZ: Object,
         isVoiceDisabled: Boolean,
-        speaking: Boolean,
         textToSpeak: String,
         recordedText: {
             type: String,
@@ -31,6 +30,7 @@ export default {
             selectedVoice: null,
             rate: 50,
             isRecording: false,
+            speaking: false,
         };
     },
     mounted() {
@@ -57,8 +57,10 @@ export default {
         toggleSpeaking() {
             if (this.speaking) {
                 this.stopNativeSpeak();
+                this.speaking = false;
             } else {
                 this.nativeSpeak(this.textToSpeak, this.selectedVoice.code, this.rate);
+                this.speaking = true;
             }
             this.$emit("update:speaking", !this.speaking);
         },

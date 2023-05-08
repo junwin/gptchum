@@ -2,18 +2,23 @@
   <div class="card">
     <h1>AI Assistant</h1>
     <TabMenu :model="items" />
-    <router-view />
+    <div class="container">
+      <router-view />
+    </div>
   </div>
 </template>
+
 
 <script>
 import Chat from "./components/Chat.vue";
 import Prompts from "./components/Prompts.vue";
+import ChatScrolling from './components/ChatScrolling.vue'
 
 export default {
   components: {
     Chat,
     Prompts,
+    ChatScrolling,
   },
   data() {
     return {
@@ -23,6 +28,11 @@ export default {
           label: "Chat",
           icon: "pi pi-fw pi-home",
           to: "/static",
+        },
+        {
+          label: "ChatScrolling",
+          icon: "pi pi-fw pi-home",
+          to: "/static/chat-scrolling",
         },
         {
           label: "Prompts",
@@ -42,5 +52,12 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
 }
 </style>
