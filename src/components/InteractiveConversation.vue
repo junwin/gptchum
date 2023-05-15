@@ -1,26 +1,25 @@
 <template>
-    <div class="interactive-conversation">
-        <div class="response-container">
-            <transition-group name="response" tag="div">
-                <div v-for="(response, index) in responses" :key="index" class="response-card">
-                    <Card>
-                        <template #title>
-                            <span :class="{ 'small-font': response.role === 'agent' || response.role === 'account' }">
-                                {{ response.role }}
-                            </span>
-                        </template>
-                        <template #content>
-                            <div class="card-textarea-wrapper">
-                                <Textarea readonly :value="response.content" class="w-full"
-                                    :rows="calculateRows(response.content)" />
-                            </div>
-                        </template>
-                    </Card>
-                </div>
-            </transition-group>
+  <div class="interactive-conversation">
+    <div class="response-container">
+      <transition-group name="response" tag="div">
+        <div v-for="(response, index) in responses" :key="index" class="response-card">
+          <Card>
+            <template #title>
+              <span :class="{ 'small-font': response.role === 'agent' || response.role === 'account' }">
+                {{ response.role }}
+              </span>
+            </template>
+            <template #content>
+              <div class="card-textarea-wrapper">
+                <Textarea readonly :value="response.content" class="w-full" :rows="calculateRows(response.content)" />
+              </div>
+            </template>
+          </Card>
         </div>
-
+      </transition-group>
     </div>
+
+  </div>
 </template>
 
   
@@ -43,16 +42,22 @@ export default {
       }
     },
     calculateRows(text) {
-      const lineHeight = 20; // Adjust this to match the line height of your textarea
-      const lines = text.split('\n');
-      let rowCount = 0;
-
-      lines.forEach((line) => {
-        rowCount += Math.ceil(line.length * lineHeight / 560); // 560 represents the width of the textarea, adjust this value according to your textarea width
-      });
-
-      rowCount += lines.length;
-      return rowCount;
+      return (text.match(/\n/g) || []).length + 1;
+    },
+    async fetchPrompts() {
+      try {
+        this.isLoading = true;
+        const prompts = await this.dataService.getPrompts(
+          this.selectedAgent.name,
+          this.accountName,
+          this.selectedConversationId
+        );
+        this.prompts = prompts;
+      } catch (error) {
+        console.error("Error fetching prompts:", error);
+      } finally {
+        this.isLoading = false;
+      }
     },
   },
   watch: {
@@ -70,76 +75,76 @@ export default {
   
 <style scoped>
 .question-section {
-    flex-shrink: 0;
-    display: flex;
-    position: sticky;
-    /* Add this line */
-    bottom: 0;
-    /* Add this line */
-    background-color: white;
-    /* Add this line */
-    padding: 1rem;
-    /* Add this line */
-    box-shadow: 0 -3px 5px rgba(0, 0, 0, 0.1);
-    /* Add this line */
-    z-index: 1;
-    /* Add this line */
+  flex-shrink: 0;
+  display: flex;
+  position: sticky;
+  /* Add this line */
+  bottom: 0;
+  /* Add this line */
+  background-color: white;
+  /* Add this line */
+  padding: 1rem;
+  /* Add this line */
+  box-shadow: 0 -3px 5px rgba(0, 0, 0, 0.1);
+  /* Add this line */
+  z-index: 1;
+  /* Add this line */
 }
 
 .interactive-conversation {
-    height: 80%;
-    /* Change this to the desired height */
-    width: 100%;
-    display: flex;
-    flex-direction: column;
+  height: 80%;
+  /* Change this to the desired height */
+  width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .response-container {
-    flex-grow: 1;
-    overflow-y: auto;
-    padding: 1rem;
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 1rem;
 }
 
 .response-card {
-    margin-bottom: 1rem;
+  margin-bottom: 1rem;
 }
 
 .card-textarea-wrapper {
-    display: flex;
-    flex-grow: 1;
+  display: flex;
+  flex-grow: 1;
 }
 
 .card-textarea-wrapper .p-textarea .p-inputtext {
-    flex-grow: 1;
-    width: auto !important;
+  flex-grow: 1;
+  width: auto !important;
 }
 
 
 .response-enter-active,
 .response-leave-active {
-    transition: transform 0.3s ease-out;
+  transition: transform 0.3s ease-out;
 }
 
 .response-enter,
 .response-leave-to {
-    transform: translateY(100%);
+  transform: translateY(100%);
 }
 
 
 
 .p-toolbar-group-left {
-    width: 70%;
+  width: 70%;
 }
 
 .p-toolbar-group-right {
-    width: 30%;
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
+  width: 30%;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
 }
 
 .small-font {
-    font-size: 0.8rem;
+  font-size: 0.8rem;
 }
 </style>
   

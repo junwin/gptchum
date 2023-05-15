@@ -14,6 +14,10 @@
                 <label for="convId">Conversation Id:</label>
                 <InputText id="convId" v-model="conversationId" />
             </span>
+            <span class="p-float-label p-mr-2">
+                <Button label="G" @click="fetchExistingCompletionMessages"  />
+            </span>
+            
 
         </div>
 
@@ -130,6 +134,7 @@ export default {
             dataService: null,
             store: null,
             messages: [],
+            completions: [],
         };
     },
     mounted() {
@@ -204,6 +209,40 @@ export default {
             } catch (error) {
                 console.error("Error fetching agent names:", error);
             }
+        },
+        async fetchExistingCompletionMessages() {
+            try {
+                this.isLoading = true;
+                const prompts = await this.dataService.getPrompts(
+                    this.selectedAgent.name,
+                    this.accountName,
+                    this.conversationId
+                );
+                this.completions = prompts;
+                var existingMessages = this.processConversationData(this.completions)
+                var zzzz = this.responsesZZ.concat(existingMessages)
+                //this.responsesZZ.concat(existingMessages)
+                this.responsesZZ = zzzz 
+            } catch (error) {
+                console.error("Error fetching prompts:", error);
+            } finally {
+                this.isLoading = false;
+            }
+        },
+        processConversationData(data) {
+            let result = [];
+            // Loop over each conversation in the data
+            for (let conversation of data) {
+                // Loop over each message in the conversation
+                for (let message of conversation.messages) {
+                    let obj = {
+                        role: message.role,
+                        content: message.content
+                    };
+                    result.push(obj);
+                }
+            }
+            return result;
         },
         onSpeechResult(result) {
             this.question = result;
