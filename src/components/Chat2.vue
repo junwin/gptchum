@@ -1,27 +1,32 @@
 <template>
-    <div :class="['app-container', { 'dark-theme': isDarkMode }]">
-      <div class="toolbar-container">
-        <div class="p-mr-2">
-          <Dropdown id="agentDropdown" v-model="selectedAgent" :options="agents" optionLabel="name" />
-        </div>
-  
-        <span class="p-float-label p-mr-2">
-          <label for="accountName">Account Name:</label>
-          <InputText type="text" id="accountName" v-model="accountName" />
-        </span>
-  
-        <span class="p-float-label p-mr-2">
-          <label for="convId">Conversation Id:</label>
-          <InputText id="convId" v-model="conversationId" />
-        </span>
-      </div>
-  
+  <div :class="['app-container', { 'dark-theme': isDarkMode }]">
+    <div class="toolbar-container">
       <div class="p-mr-2">
-        <ChatWindow :assistantName="selectedAgent.name" :userName="accountName" :conversationId="conversationId"
-          :currentMessages="responses" @new-message="handleNewMessage" />
+        <Dropdown id="agentDropdown" v-model="selectedAgent" :options="agents" optionLabel="name" />
+      </div>
+
+      <span class="p-float-label p-mr-2">
+        <label for="accountName">Account Name:</label>
+        <InputText type="text" id="accountName" v-model="accountName" />
+      </span>
+
+      <div class="p-float-label p-mr-2">
+        <label for="conversationIdDropdown">Conversation ID:</label>
+        <Dropdown id="conversationIdDropdown" v-model="selectedConversationId" :options="conversationIds" optionLabel="id" />
+      </div>
+
+      <div class="p-mr-2">
+        <Button label="Fetch Prompts" @click="fetchPrompts" />
       </div>
     </div>
-  </template>
+
+    <div class="p-mr-2">
+      <ChatWindow :assistantName="selectedAgent.name" :userName="accountName" :conversationId="selectedConversationId"
+        :currentMessages="responses" @new-message="handleNewMessage" />
+    </div>
+  </div>
+</template>
+
   
 <style scoped>
 .app-container {
@@ -73,7 +78,8 @@ export default {
             question: "",
             answer: "",
             selectedVoice: null,
-
+            conversationIds: [],
+            selectedConversationId: null,
             isLoading: false,
             speaking: false,
             conversationId: this.getCurrentDateYYYYMMDD(),
@@ -148,6 +154,30 @@ export default {
         },
         onSpeechResult(result) {
             this.question = result;
+        },
+        async fetchConversationIds() {
+            try {
+                const response = await this.dataService.getConversationIds(this.selectedAgent.name, this.accountName);
+                this.conversationIds = response.map(id => ({ id }));
+                this.selectedConversationId = this.conversationIds.length > 0 ? this.conversationIds[0].id : null;
+            } catch (error) {
+                console.error(error);
+            }
+        },
+        async fetchPrompts() {
+            try {
+                this.isLoading = true;
+                const prompts = await this.dataService.getPrompts(
+                    this.selectedAgent.name,
+                    this.accountName,
+                    this.selectedConversationId
+                );
+                this.prompts = prompts;
+            } catch (error) {
+                console.error("Error fetching prompts:", error);
+            } finally {
+                this.isLoading = false;
+            }
         },
     },
 };
