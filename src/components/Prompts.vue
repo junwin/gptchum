@@ -40,14 +40,14 @@
             <div v-if="selectedPrompt">
                 <h3>Conversation</h3>
                 <ol>
-                    <li v-for="(entry, index) in selectedPrompt.conversation" :key="index">
+                    <li v-for="(entry, index) in selectedPrompt.messages" :key="index">
                         <b>{{ entry.role }}:</b>
                         <Textarea id="entry.role" v-model="entry.content" :rows="5" class="w-full" />
                     </li>
                 </ol>
                 <h3>Keywords</h3>
 
-                <Chip v-for="(keyword, index) in selectedPrompt.keywords" :key="index">{{ keyword }}</Chip>
+                <Chip v-for="(keyword, index) in selectedPrompt.tags" :key="index">{{ keyword }}</Chip>
 
             </div>
             <template #footer>
