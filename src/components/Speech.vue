@@ -1,13 +1,13 @@
 <template>
     <div>
-      <Button :label="recordButtonLabel" @click="toggleRecording" :disabled="isVoiceDisabled" />
-      <Button :label="speaking ? 'Stop Speaking' : 'Speak'" @click="toggleSpeaking" :disabled="isVoiceDisabled" />
-      <Dropdown v-model="selectedVoice" :options="voices" optionLabel="name" />
-      <div class="w-full">
-        <Slider v-model="rate" class="w-full" :min="1" :max="100" :step="1" />
-      </div>
+        <Button :label="recordButtonLabel" @click="toggleRecording" :disabled="isVoiceDisabled" />
+        <Button :label="speaking ? 'Stop Speaking' : 'Speak'" @click="toggleSpeaking" :disabled="isVoiceDisabled" />
+        <Dropdown v-model="selectedVoice" :options="voices" optionLabel="name" />
+        <div class="w-full">
+            <Slider v-model="rate" class="w-full" :min="1" :max="100" :step="1" />
+        </div>
     </div>
-  </template>
+</template>
   
 <script>
 export default {
@@ -38,7 +38,7 @@ export default {
         if (speechSynthesis.onvoiceschanged !== undefined) {
             speechSynthesis.onvoiceschanged = this.populateVoiceList;
         }
-     
+
     },
     methods: {
         toggleRecording() {
@@ -46,10 +46,11 @@ export default {
                 this.stopNativeRecording();
                 this.isRecording = false;
             } else {
-                const selectedVoice = this.voicesAll.find(
-                    (v) => v.name === this.selectedVoice.code
-                );
-                this.startNativeRecording(selectedVoice.lang);
+                //const selectedVoice = this.voicesAll.find(
+                 //   (v) => v.name === this.selectedVoice.code
+                //);
+                //this.startNativeRecording(selectedVoice.lang);
+                this.startNativeRecording2();
                 this.isRecording = true;
             }
             this.$emit("update:isRecording", !this.isRecording);
@@ -100,6 +101,40 @@ export default {
             });
             // Save the recognition object to the Vue instance
             this.recognition = recognition;
+        },
+        startNativeRecording2() {
+            // Check if MediaRecorder is available
+            if (!navigator.mediaDevices && !navigator.mediaDevices.getUserMedia) {
+                console.log('MediaDevices API not available');
+            } else {
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(stream => {
+                        const mediaRecorder = new MediaRecorder(stream);
+
+                        let audioChunks = [];
+
+                        mediaRecorder.ondataavailable = event => {
+                            audioChunks.push(event.data);
+                        };
+
+                        mediaRecorder.start();
+
+                        // Stop recording after 3 seconds and save the data
+                        setTimeout(() => {
+                            mediaRecorder.stop();
+                        }, 10000);
+
+                        mediaRecorder.onstop = () => {
+                            const audioBlob = new Blob(audioChunks);
+                            const audioUrl = URL.createObjectURL(audioBlob);
+                            const audio = new Audio(audioUrl);
+
+                            // Now audio contains the recorded data that can be played
+                            audio.play();
+                        };
+                    })
+                    .catch(err => console.log('Error: ', err));
+            };
         },
         stopNativeRecording() {
             if (this.recognition) {
