@@ -35,7 +35,7 @@ class DataService {
 
   async getPrompts(agentName, accountName, conversationId) {
     try {
-      const response = await this.apiClient.get("/prompts", {
+      const response = await this.apiClient.get("/completions", {
         params: {
           agentName,
           accountName,
@@ -53,7 +53,7 @@ class DataService {
 
   async updatePrompt(agentName, accountName, id, prompt) {
     try {
-      const response = await this.apiClient.put("/prompts", prompt, {
+      const response = await this.apiClient.put("/completions", prompt, {
         params: {
           agentName,
           accountName,
@@ -69,7 +69,7 @@ class DataService {
 
   async deletePrompt(agentName, accountName, id) {
     try {
-      const response = await this.apiClient.delete("/prompts", {
+      const response = await this.apiClient.delete("/completions", {
         params: {
           agentName,
           accountName,
@@ -117,7 +117,7 @@ class DataService {
 
   async computeConversations(data) {
     try {
-      const response = await this.apiClient.post("/computeConversations", data);
+      const response = await this.apiClient.post("/prompt_builder", data);
       return response.data;
     } catch (error) {
       console.error(error);

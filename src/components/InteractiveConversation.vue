@@ -42,7 +42,7 @@ export default {
       }
     },
     calculateRows(text) {
-      return (text.match(/\n/g) || []).length + 1;
+      return (text.match(/\n/g) || []).length + 2;
     },
     async fetchPrompts() {
       try {
