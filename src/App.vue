@@ -11,14 +11,18 @@
 
 <script>
 import Chat from "./components/Chat.vue";
+import Chat2 from "./components/Chat2.vue";
 import Prompts from "./components/Prompts.vue";
 import ChatScrolling from './components/ChatScrolling.vue'
+
 
 export default {
   components: {
     Chat,
     Prompts,
     ChatScrolling,
+    Chat2
+
   },
   data() {
     return {
@@ -38,6 +42,11 @@ export default {
           label: "Prompts",
           icon: "pi pi-box",
           to: "/static/prompts",
+        },
+        {
+          label: "Chat2",
+          icon: "pi pi-box",
+          to: "/static/chat2",
         },
       ],
     };
