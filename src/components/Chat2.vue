@@ -1,60 +1,62 @@
 <template>
-  <div :class="['app-container', { 'dark-theme': isDarkMode }]">
-    <div class="toolbar-container">
-      <div class="p-mr-2">
-        <Dropdown id="agentDropdown" v-model="selectedAgent" :options="agents" optionLabel="name" />
-      </div>
+    <div :class="['app-container', { 'dark-theme': isDarkMode }]">
+        <div class="toolbar-container">
+            <div class="p-mr-2">
+                <Dropdown id="agentDropdown" v-model="selectedAgent" :options="agents" optionLabel="name" />
+            </div>
 
-      <span class="p-float-label p-mr-2">
-        <label for="accountName">Account Name:</label>
-        <InputText type="text" id="accountName" v-model="accountName" />
-      </span>
+            <span class="p-float-label p-mr-2">
+                <label for="accountName">Account Name:</label>
+                <InputText type="text" id="accountName" v-model="accountName" />
+            </span>
 
-      <div class="p-float-label p-mr-2">
-        <label for="conversationIdDropdown">Conversation ID:</label>
-        <Dropdown id="conversationIdDropdown" v-model="selectedConversationId" :options="conversationIds" optionLabel="id" />
-      </div>
+            <div class="p-float-label p-mr-2">
+                <label for="conversationIdDropdown">Conversation ID:</label>
+                <Dropdown id="conversationIdDropdown" v-model="selectedConversationId" :options="conversationIds"
+                    optionLabel="id" />
+            </div>
 
-      <div class="p-mr-2">
-        <Button label="Fetch Prompts" @click="fetchPrompts" />
-      </div>
+            <div class="p-mr-2">
+                <Button label="Fetch Prompts" @click="fetchPrompts" />
+            </div>
+        </div>
+
+        <div class="p-mr-2">
+            <ChatWindow :assistantName="selectedAgent.name" :userName="accountName" :conversationId="selectedConversationId"
+                :currentMessages="responses" @new-message="handleNewMessage" />
+        </div>
     </div>
-
-    <div class="p-mr-2">
-      <ChatWindow :assistantName="selectedAgent.name" :userName="accountName" :conversationId="selectedConversationId"
-        :currentMessages="responses" @new-message="handleNewMessage" />
-    </div>
-  </div>
 </template>
 
   
 <style scoped>
 .app-container {
-  width: 100%;
-  height: 100%;
+    width: 100%;
+    height: 100%;
 }
 
 .toolbar-container {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  width: 100%;
-  padding: 0.5rem;
-  background-color: #f5f5f5;
-  border: 1px solid #d3d3d3;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    width: 100%;
+    padding: 0.5rem;
+    background-color: #f5f5f5;
+    border: 1px solid #d3d3d3;
 }
+
 .dark-theme {
-  --bg-color: #1a1a1a;
-  --text-color: #ffffff;
-  --input-bg-color: #ffffff;
+    --bg-color: #1a1a1a;
+    --text-color: #ffffff;
+    --input-bg-color: #ffffff;
 }
 
 @media (prefers-color-scheme: light) {
-  .dark-theme {
-    --bg-color: #ffffff;
-    --text-color: #000000;
-    --input-bg-color: #f2f2f2;
-  }
+    .dark-theme {
+        --bg-color: #ffffff;
+        --text-color: #000000;
+        --input-bg-color: #f2f2f2;
+    }
 }
 </style>
   
@@ -101,9 +103,11 @@ export default {
     watch: {
         selectedAgent(newAgentName) {
             this.store.agentName = newAgentName;
+            this.fetchConversationIds()
         },
         accountName(newAccountName) {
             this.store.accountName = newAccountName;
+            this.fetchConversationIds()
         },
     },
     computed: {
@@ -114,7 +118,7 @@ export default {
     methods: {
         async ask() {
             this.isLoading = true;
-            //this.responses.push({ role: this.accountName, content: this.question });
+            this.responses.push({ role: this.accountName, content: this.question });
             try {
                 const response = await this.dataService.askQuestion(
                     this.question,
@@ -170,15 +174,32 @@ export default {
                 const prompts = await this.dataService.getPrompts(
                     this.selectedAgent.name,
                     this.accountName,
-                    this.selectedConversationId
+                    this.selectedConversationId.id
                 );
-                this.prompts = prompts;
+                //this.prompts = prompts;
+                this.transformCompletions(prompts);
             } catch (error) {
                 console.error("Error fetching prompts:", error);
             } finally {
                 this.isLoading = false;
             }
         },
+        transformCompletions(completions) {
+            // Clear the existing responses
+            this.responses = [];
+
+            // Transform completions and update this.responses
+            completions.forEach(completion => {
+                const transformedMessages = completion.messages.map(message => {
+                    const role = (message.role === "assistant") ? this.selectedAgent.name : this.accountName;
+                    const content = message.content;
+                    return { role, content };
+                });
+
+                this.responses.push(...transformedMessages);
+            });
+        },
+  
     },
 };
 </script>

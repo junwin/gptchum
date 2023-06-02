@@ -2,7 +2,7 @@
   <div class="chat-window">
       <div class="card-stack" ref="cardStack">
           <!-- Render the cards here -->
-          <div v-for="message in messages" :key="message.id" class="card">
+          <div v-for="message in currentMessages" :key="message.id" class="card">
               <div class="participant-name">{{ message.role === userName ? userName : assistantName }}</div>
               <textarea class="message" :rows="calcRows(message.content)" :value="message.content" readonly></textarea>
           </div>
@@ -32,7 +32,7 @@ export default {
     },
     mounted() {
         // Set the initial messages
-        this.messages = this.currentMessages;
+        //this.currentMessages = this.currentMessages;
         // Scroll to the bottom of the card stack
         this.scrollToBottom();
     },
@@ -45,7 +45,7 @@ export default {
                     content: this.inputText.trim(),
                     conversation_id: this.conversationId
                 };
-                this.messages.push(newMessage);
+                //this.messages.push(newMessage);
                 this.inputText = '';
                 this.scrollToBottom();
 
