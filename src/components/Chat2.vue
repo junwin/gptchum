@@ -120,7 +120,7 @@ export default {
             this.isLoading = true;
             this.responses.push({ role: this.accountName, content: this.question });
             try {
-                const response = await this.dataService.askQuestion(
+                const response = await this.dataService.askQuestionMultiAgent(
                     this.question,
                     this.selectedAgent.name,
                     this.accountName,

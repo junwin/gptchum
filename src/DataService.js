@@ -21,6 +21,23 @@ class DataService {
     }
   }
 
+  async askQuestionMultiAgent(question, agentName, accountName, conversationId, selectType, secondaryAgent) {
+    try {
+      if(agentName == "glinda") {
+        secondaryAgent = "dorothy";
+        const response = await this.apiClient.post("/ask", { question, agentName, accountName, conversationId, selectType, secondaryAgent});
+        return response.data;
+      } else {
+        const response = await this.apiClient.post("/ask", { question, agentName, accountName, conversationId, selectType});
+        return response.data;
+      }
+      
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
+  }
+
   async getAgentNames() {
     try {
       const response = await this.apiClient.get("/agents");

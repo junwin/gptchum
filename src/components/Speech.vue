@@ -1,6 +1,6 @@
 <template>
     <div>
-        <Button :label="recordButtonLabel" @click="toggleRecording" :disabled="isVoiceDisabled" />
+        <Button :label="recordingState" @click="toggleRecording" :disabled="isVoiceDisabled" />
         <Button :label="speaking ? 'Stop Speaking' : 'Speak'" @click="toggleSpeaking" :disabled="isVoiceDisabled" />
         <Dropdown v-model="selectedVoice" :options="voices" optionLabel="name" />
         <div class="w-full">
@@ -10,6 +10,7 @@
 </template>
   
 <script>
+import axios from 'axios';
 export default {
     name: "Speech",
     props: {
@@ -31,6 +32,10 @@ export default {
             rate: 50,
             isRecording: false,
             speaking: false,
+            audioChunks: [],
+            recordingState: 'start',
+            mediaRecorder: null,
+            recordingTimeoutId: null,
         };
     },
     mounted() {
@@ -43,14 +48,13 @@ export default {
     methods: {
         toggleRecording() {
             if (this.isRecording) {
-                this.stopNativeRecording();
+                this.mediaRecorder.stop();
+                //this.stopApiRecording();
                 this.isRecording = false;
-            } else {
-                //const selectedVoice = this.voicesAll.find(
-                 //   (v) => v.name === this.selectedVoice.code
-                //);
-                //this.startNativeRecording(selectedVoice.lang);
-                this.startNativeRecording2();
+                this.recordingState = 'start'
+            }else{
+                this.recordingState = 'starting';
+                this.startApiRecording();
                 this.isRecording = true;
             }
             this.$emit("update:isRecording", !this.isRecording);
@@ -59,6 +63,7 @@ export default {
             if (this.speaking) {
                 this.stopNativeSpeak();
                 this.speaking = false;
+                
             } else {
                 this.nativeSpeak(this.textToSpeak, this.selectedVoice.code, this.rate);
                 this.speaking = true;
@@ -111,6 +116,8 @@ export default {
                     .then(stream => {
                         const mediaRecorder = new MediaRecorder(stream);
 
+
+
                         let audioChunks = [];
 
                         mediaRecorder.ondataavailable = event => {
@@ -120,7 +127,7 @@ export default {
                         mediaRecorder.start();
 
                         // Stop recording after 3 seconds and save the data
-                        setTimeout(() => {
+                        this.recordingTimeoutId = setTimeout(() => {
                             mediaRecorder.stop();
                         }, 10000);
 
@@ -139,6 +146,83 @@ export default {
         stopNativeRecording() {
             if (this.recognition) {
                 this.recognition.stop();
+            }
+        },
+        stopApiRecording() {
+            this.isRecording = false;
+            this.mediaRecorder = null;
+            this.recordingState = 'translate';
+            if(this.recordingTimeoutId){
+                clearTimeout(this.recordingTimeoutId);
+            }
+            if (this.audioChunks.length === 0) {
+                this.recordingState = 'start';
+                this.$emit("speechResult", "no sound recorded");
+                return;
+            }
+            const audioBlob = new Blob(this.audioChunks, { 'type': 'audio/webm; codecs=opus' });
+            const audioFile = new File([audioBlob], "recording.webm", { 'type': 'audio/webm; codecs=opus' });
+
+            const formData = new FormData();
+            formData.append('file', audioFile);
+            formData.append('model', 'whisper-1');
+            formData.append('language', 'es');
+
+            axios
+                .post('https://api.openai.com/v1/audio/transcriptions', formData, {
+                    headers: {
+                        'Content-Type': audioBlob.type,
+                        'Authorization': 'zzzzzzzzzzzzzzzzzzzzzzzzz',
+                        
+                    },
+                })
+                .then(response => {
+                    const transcription = response.data.text;
+                    this.$emit("speechResult", transcription);
+                    //console.log('Transcription:', transcription);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+                this.recordingState = 'start';
+        },
+
+        startApiRecording() {
+            // Check if MediaRecorder is available
+            if (!navigator.mediaDevices && !navigator.mediaDevices.getUserMedia) {
+                console.log('MediaDevices API not available');
+            } else {
+                const constraints = { audio: true, video: false };
+                const options = {
+                    audioBitsPerSecond: 128000,
+                    mimeType: "audio/webm",
+                };
+                navigator.mediaDevices.getUserMedia(constraints)
+                    .then(stream => {
+                        this.mediaRecorder = new MediaRecorder(stream, options);
+                        var myType = this.mediaRecorder.mimeType; // should return "audio/webm"
+                        this.audioChunks = [];
+
+                        this.mediaRecorder.ondataavailable = event => {
+                            this.audioChunks.push(event.data);
+                        };
+
+                        this.mediaRecorder.onstop = () => {
+                            this.stopApiRecording();
+                            const audioBlob = new Blob(this.audioChunks);
+                        };
+
+                        this.mediaRecorder.start();
+                        this.recordingState = 'talk';
+
+                        // Stop recording after 10 seconds
+                        this.recordingTimeoutId = setTimeout(() => {
+                            if (this.mediaRecorder != null)
+                                this.mediaRecorder.stop();
+                            //this.stopApiRecording();
+                        }, 10000);
+                    })
+                    .catch(err => console.log('Error: ', err));
             }
         },
         nativeSpeak(text, voiceCode, rate) {
