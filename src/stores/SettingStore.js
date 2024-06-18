@@ -5,8 +5,11 @@ const isProd = process.env.NODE_ENV === 'production';
 
 //const baseUrl = isProd ? 'https://localhost:5000' : 'http://localhost:5000';
 //const baseUrl = isProd ? 'https://localhost:5000' : 'http://localhost:5000';
-const baseUrl = isProd ? 'https://ba40-162-204-226-110.ngrok-free.app'  : 'http://localhost:5000';
+//const baseUrl = isProd ? 'https://ba40-162-204-226-110.ngrok-free.app'  : 'http://localhost:5000';
+//const baseUrl = 'https://localhost:5000';
+const baseUrl = 'http://localhost:5000';
 const ds = new DataService(baseUrl);
+
 
 export const useSettingStore = defineStore('settings', {
     state: () => ({

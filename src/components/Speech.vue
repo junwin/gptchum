@@ -172,7 +172,7 @@ export default {
                 .post('https://api.openai.com/v1/audio/transcriptions', formData, {
                     headers: {
                         'Content-Type': audioBlob.type,
-                        'Authorization': 'zzzzzzzzzzzzzzzzzzzzzzzzz',
+                        'Authorization': '',
                         
                     },
                 })
