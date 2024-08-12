@@ -1,74 +1,76 @@
 <template>
   <div class="chat-window">
-      <div class="card-stack" ref="cardStack">
-          <!-- Render the cards here -->
-          <div v-for="message in currentMessages" :key="message.id" class="card">
-              <div class="participant-name">{{ message.role === userName ? userName : assistantName }}</div>
-              <textarea class="message" :rows="calcRows(message.content)" :value="message.content" readonly></textarea>
-          </div>
+    <ScrollPanel class="card-stack" ref="cardStack">
+      <div v-for="message in currentMessages" :key="message.id" class="card">
+        <div class="participant-name">{{ message.role === userName ? userName : assistantName }}</div>
+        <TextArea class="message" :rows="calcRows(message.content)" :value="message.content" readonly autoResize />
       </div>
-      <div class="input-box">
-          <textarea v-model="inputText" placeholder="Enter your message"></textarea>
-          <button @click="sendMessage">Send</button>
-      </div>
+    </ScrollPanel>
+    <div class="input-box">
+      <Textarea v-model="inputText" placeholder="Enter your message" autoResize />
+      <Button label="Send" @click="sendMessage" />
+    </div>
   </div>
 </template>
 
-  
-  
 <script>
-export default {
-    props: {
-        assistantName: String,
-        userName: String,
-        conversationId: String,
-        currentMessages: Array
-    },
-    data() {
-        return {
-            messages: [],
-            inputText: ''
-        };
-    },
-    mounted() {
-        // Set the initial messages
-        //this.currentMessages = this.currentMessages;
-        // Scroll to the bottom of the card stack
-        this.scrollToBottom();
-    },
-    methods: {
-        sendMessage() {
-            if (this.inputText.trim() !== '') {
-                const newMessage = {
-                    id: Date.now().toString(),
-                    role: this.userName,
-                    content: this.inputText.trim(),
-                    conversation_id: this.conversationId
-                };
-                //this.messages.push(newMessage);
-                this.inputText = '';
-                this.scrollToBottom();
+import { ref, onMounted, nextTick } from 'vue';
 
-                // Emit an event with the new message for the parent component to process
-                this.$emit('new-message', newMessage);
-            }
-        },
-        calcRows(content) {
-            return content.split('\n').length;
-        },
-        scrollToBottom() {
-            // Scroll to the bottom of the card stack
-            this.$nextTick(() => {
-                this.$refs.cardStack.scrollTop = this.$refs.cardStack.scrollHeight;
-            });
+export default {
+  props: {
+    assistantName: String,
+    userName: String,
+    conversationId: String,
+    currentMessages: Array,
+  },
+  setup(props, { emit }) {
+    const inputText = ref('');
+    const cardStack = ref(null);
+
+    const sendMessage = () => {
+      if (inputText.value.trim() !== '') {
+        const newMessage = {
+          id: Date.now().toString(),
+          role: props.userName,
+          content: inputText.value.trim(),
+          conversation_id: props.conversationId,
+        };
+        inputText.value = '';
+        scrollToBottom();
+        emit('new-message', newMessage);
+      }
+    };
+
+    const calcRows = (content) => {
+      return content.split('\n').length;
+    };
+
+    const scrollToBottom = () => {
+      nextTick(() => {
+        if (cardStack.value) {
+          cardStack.value.$el.scrollTop = cardStack.value.$el.scrollHeight;
         }
-    }
+      });
+    };
+
+
+    onMounted(() => {
+      scrollToBottom();
+    });
+
+    return {
+      inputText,
+      sendMessage,
+      calcRows,
+      scrollToBottom,
+    };
+  },
 };
 </script>
-  
+
 <style scoped>
 .chat-window {
-  height: calc(100vh - 250px); /* Adjust the height as needed */
+  height: calc(100vh - 250px);
   display: flex;
   flex-direction: column;
   background-color: var(--bg-color);
@@ -116,9 +118,6 @@ export default {
   margin-top: 5px;
   overflow-y: auto;
   background-color: #242323;
-  color:  #f2f2f2
+  color: #f2f2f2;
 }
 </style>
-  
-  
-  
