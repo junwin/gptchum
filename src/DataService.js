@@ -75,7 +75,8 @@ class DataService {
       throw error;
     }
   }
-  // --- Chat sessions (new) ---
+
+  // --- Chat sessions ---
 
   async createChat(agentName, accountName, friendlyName = null, tags = null) {
     try {
@@ -120,87 +121,6 @@ class DataService {
       const agents = response.data;
       const agentNames = agents.map((agent) => agent.name);
       return agentNames;
-    } catch (error) {
-      console.error(error);
-      throw error;
-    }
-  }
-
-  async getPrompts(agentName, accountName, conversationId) {
-    try {
-      const response = await this.apiClient.get("/completions", {
-        params: {
-          agentName,
-          accountName,
-          conversationId,
-        },
-      });
-
-      return response.data;
-    } catch (error) {
-      console.error(error);
-      throw error;
-    }
-  }
-
-  async updatePrompt(agentName, accountName, id, prompt) {
-    try {
-      const response = await this.apiClient.put("/completions", prompt, {
-        params: {
-          agentName,
-          accountName,
-          id,
-        },
-      });
-      return response.data;
-    } catch (error) {
-      console.error(error);
-      throw error;
-    }
-  }
-
-  async deletePrompt(agentName, accountName, id) {
-    try {
-      const response = await this.apiClient.delete("/completions", {
-        params: {
-          agentName,
-          accountName,
-          id,
-        },
-      });
-      return response.data;
-    } catch (error) {
-      console.error(error);
-      throw error;
-    }
-  }
-
-  async getConversationIds(agentName, accountName) {
-    try {
-      const response = await this.apiClient.get("/conversationIds", {
-        params: {
-          agentName,
-          accountName,
-        },
-      });
-      return response.data;
-    } catch (error) {
-      console.error(error);
-      throw error;
-    }
-  }
-
-  async renameConversationId(agentName, accountName, existingId, newId) {
-    try {
-      const response = await this.apiClient.put("/conversationIds", null, {
-        params: {
-          agentName,
-          accountName,
-          existingId,
-          newId,
-        },
-      });
-      return response.data;
     } catch (error) {
       console.error(error);
       throw error;
