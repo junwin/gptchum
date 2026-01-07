@@ -13,7 +13,8 @@ class DataService {
 
   async askQuestion(question, agentName, accountName, conversationId, selectType) {
     try {
-      const response = await this.apiClient.post("/ask", { question, agentName, accountName, conversationId, selectType });
+      const contextName="lucy_client";
+      const response = await this.apiClient.post("/ask", { question, agentName, accountName, conversationId, selectType, contextName });
       return response.data;
     } catch (error) {
       console.error(error);
@@ -23,15 +24,54 @@ class DataService {
 
   async askQuestionMultiAgent(question, agentName, accountName, conversationId, selectType, secondaryAgent) {
     try {
+      const contextName="lucy_client";
       if(agentName == "glinda") {
         secondaryAgent = "dorothy";
-        const response = await this.apiClient.post("/ask", { question, agentName, accountName, conversationId, selectType, secondaryAgent});
+        const response = await this.apiClient.post("/ask", { question, agentName, accountName, conversationId, selectType, secondaryAgent, contextName});
         return response.data;
       } else {
-        const response = await this.apiClient.post("/ask", { question, agentName, accountName, conversationId, selectType});
+        const response = await this.apiClient.post("/ask", { question, agentName, accountName, conversationId, selectType, contextName});
         return response.data;
       }
       
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
+  }
+  // --- Chat sessions (new) ---
+
+  async createChat(agentName, accountName, friendlyName = null, tags = null) {
+    try {
+      const response = await this.apiClient.post("/chats", {
+        agentName,
+        accountName,
+        friendlyName,
+        tags,
+      });
+      return response.data; // { id, account_name, agent_name, friendly_name, ... }
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
+  }
+
+  async listChats(accountName, agentName = null, limit = 50) {
+    try {
+      const response = await this.apiClient.get("/chats", {
+        params: { accountName, agentName, limit },
+      });
+      return response.data; // array of sessions (summary shape)
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
+  }
+
+  async getChat(sessionId) {
+    try {
+      const response = await this.apiClient.get(`/chats/${sessionId}`);
+      return response.data; // includes messages[]
     } catch (error) {
       console.error(error);
       throw error;
