@@ -18,10 +18,6 @@ import Column from 'primevue/column';
 import Chip from 'primevue/chip'
 import ScrollPanel from 'primevue/scrollpanel';
 import { createPinia } from 'pinia'
-import InteractiveConversation from './components/InteractiveConversation.vue';
-
-
-
 
 import TabMenu from 'primevue/tabmenu';
 import "primevue/resources/themes/lara-light-blue/theme.css";
@@ -30,6 +26,7 @@ import "primevue/resources/themes/lara-light-blue/theme.css";
 import 'primevue/resources/primevue.min.css' // core css
 import 'primeicons/primeicons.css' // icons
 import 'primeflex/primeflex.css'
+
 const app = createApp(App)
 app.use(PrimeVue)
 app.component('InputText', InputText)
@@ -47,7 +44,7 @@ app.component('Column', Column);
 app.component('Chip', Chip);
 app.component('ScrollPanel', ScrollPanel);
 app.component('VirtualScroller', VirtualScroller);
-app.component('InteractiveConversation', InteractiveConversation);
+
 const pinia = createPinia()
 app.use(pinia)
 app.use(router)
