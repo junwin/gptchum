@@ -127,6 +127,24 @@ class DataService {
     }
   }
 
+  async getContextNames(accountName) {
+    try {
+      if (accountName == null || String(accountName).trim() === "") {
+        throw new Error("accountName is required");
+      }
+
+      const response = await this.apiClient.get("/context/names", {
+        params: { accountName },
+      });
+
+      // Lucy returns a JSON array of strings.
+      return response.data;
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
+  }
+
   async computeConversations(data) {
     try {
       const response = await this.apiClient.post("/prompt_builder", data);
