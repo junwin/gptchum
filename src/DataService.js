@@ -11,10 +11,23 @@ class DataService {
     });
   }
 
-  async askQuestion(question, agentName, accountName, conversationId, selectType) {
+  async askQuestion(
+    question,
+    agentName,
+    accountName,
+    conversationId,
+    selectType,
+    contextName
+  ) {
     try {
-      const contextName="lucy_client";
-      const response = await this.apiClient.post("/ask", { question, agentName, accountName, conversationId, selectType, contextName });
+      const response = await this.apiClient.post("/ask", {
+        question,
+        agentName,
+        accountName,
+        conversationId,
+        selectType,
+        contextName,
+      });
       return response.data;
     } catch (error) {
       console.error(error);
@@ -22,18 +35,41 @@ class DataService {
     }
   }
 
-  async askQuestionMultiAgent(question, agentName, accountName, conversationId, selectType, secondaryAgent) {
+  async askQuestionMultiAgent(
+    question,
+    agentName,
+    accountName,
+    conversationId,
+    selectType,
+    secondaryAgent = null,
+    contextName
+  ) {
     try {
-      const contextName="lucy_client";
-      if(agentName == "glinda") {
+      // Previously this method hard-coded secondaryAgent when agentName was
+      // "glinda". That prevented callers from explicitly controlling
+      // secondaryAgent/contextName. Keep backwards compatibility by defaulting
+      // secondaryAgent to "dorothy" only when the caller does not supply one.
+      if (agentName === "glinda" && secondaryAgent == null) {
         secondaryAgent = "dorothy";
-        const response = await this.apiClient.post("/ask", { question, agentName, accountName, conversationId, selectType, secondaryAgent, contextName});
-        return response.data;
-      } else {
-        const response = await this.apiClient.post("/ask", { question, agentName, accountName, conversationId, selectType, contextName});
-        return response.data;
       }
-      
+
+      const payload = {
+        question,
+        agentName,
+        accountName,
+        conversationId,
+        selectType,
+        contextName,
+      };
+
+      // Only include secondaryAgent when present, so the API receives the same
+      // shape as before for single-agent calls.
+      if (secondaryAgent != null) {
+        payload.secondaryAgent = secondaryAgent;
+      }
+
+      const response = await this.apiClient.post("/ask", payload);
+      return response.data;
     } catch (error) {
       console.error(error);
       throw error;
@@ -82,7 +118,7 @@ class DataService {
     try {
       const response = await this.apiClient.get("/agents");
       const agents = response.data;
-      const agentNames = agents.map(agent => agent.name);
+      const agentNames = agents.map((agent) => agent.name);
       return agentNames;
     } catch (error) {
       console.error(error);
@@ -99,7 +135,6 @@ class DataService {
           conversationId,
         },
       });
-
 
       return response.data;
     } catch (error) {

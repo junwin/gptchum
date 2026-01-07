@@ -19,6 +19,7 @@ export const useSettingStore = defineStore('settings', {
         dataService: ds,
         agentName: 'lucy',
         accountName: 'test',
+        // contextName is NOT currently tracked here; see Chat2/ChatWindow for per-chat context state.
     }),
     getters: {
         GetInvLocUrl(state) {

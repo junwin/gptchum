@@ -19,6 +19,17 @@
         <InputText type="text" id="accountName" v-model="accountName" />
       </span>
 
+      <!-- Context -->
+      <span class="p-float-label p-mr-2">
+        <label for="contextName">Context:</label>
+        <InputText
+          type="text"
+          id="contextName"
+          v-model="contextName"
+          placeholder="default"
+        />
+      </span>
+
       <!-- Chat selector (OBJECT-based, stable via dataKey) -->
       <div class="p-mr-2">
         <Dropdown
@@ -73,6 +84,7 @@
         :userName="accountName || 'user'"
         :conversationId="selectedSession?.id || null"
         :currentMessages="responses"
+        :contextName="(contextName || '').trim() || null"
         @new-message="handleNewMessage"
       />
     </div>
@@ -142,6 +154,8 @@ export default {
       agents: [],
       selectedAgent: null,
       accountName: "",
+      // contextName is user-entered state; it is passed through to DataService (no hard-coded context)
+      contextName: "",
       isLoading: false,
 
       sessions: [],
@@ -343,12 +357,16 @@ export default {
       try {
         this.isLoading = true;
 
+        const contextName = (this.contextName || "").trim() || null;
+
         const result = await this.dataService.askQuestionMultiAgent(
           text,
           this.selectedAgent.name,
           this.accountName,
           sessionId,
-          this.selectType
+          this.selectType,
+          null,
+          contextName
         );
 
         this.responses.push({

@@ -1,14 +1,12 @@
 # gptchum
 
-This template should help get you started developing with Vue 3 in Vite.
+This is a Vue 3 + Vite app.
 
-## Recommended IDE Setup
+## Context support
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin).
+Requests to Lucy include a **context name** so the backend can route the request.
 
-## Customize configuration
-
-See [Vite Configuration Reference](https://vitejs.dev/config/).
+If you do not set a context, the app uses `default`.
 
 ## Project Setup
 
