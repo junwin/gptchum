@@ -30,6 +30,7 @@ export default {
     assistantName: String,
     userName: String,
     conversationId: String, // this will be the GUID session id now
+    contextName: String,
     currentMessages: Array,
   },
   setup(props, { emit }) {
@@ -50,7 +51,11 @@ export default {
       if (!text) return;
 
       inputText.value = "";
-      emit("new-message", { role: props.userName, content: text });
+      emit("new-message", {
+        role: props.userName,
+        content: text,
+        contextName: props.contextName,
+      });
       scrollToBottom();
     };
 

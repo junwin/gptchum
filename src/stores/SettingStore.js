@@ -10,7 +10,6 @@ const isProd = process.env.NODE_ENV === 'production';
 const baseUrl = 'http://localhost:5000';
 const ds = new DataService(baseUrl);
 
-
 export const useSettingStore = defineStore('settings', {
     state: () => ({
         version: '1.0.0',
@@ -19,6 +18,8 @@ export const useSettingStore = defineStore('settings', {
         dataService: ds,
         agentName: 'lucy',
         accountName: 'test',
+        // Selected or typed context name used for Lucy requests.
+        contextName: '',
     }),
     getters: {
         GetInvLocUrl(state) {
@@ -33,6 +34,9 @@ export const useSettingStore = defineStore('settings', {
         getAccountName(state) {
             return state.accountName;
         },
+        getContextName(state) {
+            return state.contextName;
+        },
     },
     actions: {
         setData(newDataService) {
@@ -43,6 +47,9 @@ export const useSettingStore = defineStore('settings', {
         },
         setAccountName(newAccountName) {
             this.state.accountName = newAccountName;
+        },
+        setContextName(newContextName) {
+            this.state.contextName = newContextName;
         },
     },
 });

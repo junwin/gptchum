@@ -19,6 +19,18 @@
         <InputText type="text" id="accountName" v-model="accountName" />
       </span>
 
+      <!-- Context -->
+      <div class="p-mr-2">
+        <Dropdown
+          id="contextName"
+          v-model="contextName"
+          :options="contextOptions"
+          editable
+          placeholder="default"
+          class="context-dropdown"
+        />
+      </div>
+
       <!-- Chat selector (OBJECT-based, stable via dataKey) -->
       <div class="p-mr-2">
         <Dropdown
@@ -73,6 +85,7 @@
         :userName="accountName || 'user'"
         :conversationId="selectedSession?.id || null"
         :currentMessages="responses"
+        :contextName="(contextName || '').trim() || null"
         @new-message="handleNewMessage"
       />
     </div>
@@ -97,6 +110,10 @@
 
 .chat-dropdown {
   min-width: 320px;
+}
+
+.context-dropdown {
+  min-width: 220px;
 }
 
 .session-option {
@@ -142,6 +159,13 @@ export default {
       agents: [],
       selectedAgent: null,
       accountName: "",
+
+      // Context
+      // - contextName is user-entered state; it is passed through to DataService
+      // - contextOptions is loaded per-account via dataService.getContextNames(accountName)
+      contextName: "",
+      contextOptions: [],
+
       isLoading: false,
 
       sessions: [],
@@ -152,6 +176,9 @@ export default {
       store: null,
 
       isLoadingChat: false,
+
+      // simple debounce for accountName -> refreshContextOptions
+      _contextRefreshTimer: null,
     };
   },
 
@@ -171,6 +198,10 @@ export default {
     this.selectedAgent = this.store.getAgentName ? { name: this.store.getAgentName } : null;
     this.accountName = this.store.getAccountName || "";
 
+    // load persisted context if present
+    // (do not require store support; keep local state stable)
+    this.contextName = this.store.getContextName || "";
+
     await this.fetchAgentNames();
 
     // normalize selectedAgent to one of the option refs
@@ -179,6 +210,11 @@ export default {
       if (match) this.selectedAgent = match;
     } else if (!this.selectedAgent && this.agents.length) {
       this.selectedAgent = this.agents[0];
+    }
+
+    // best-effort: populate context dropdown if we already have an account
+    if ((this.accountName || "").trim()) {
+      await this.refreshContextOptions(this.accountName);
     }
 
     if (this.canOperate) {
@@ -203,7 +239,18 @@ export default {
       this.selectedSession = null;
       this.responses = [{ id: "hello", role: "assistant", content: "Hello! How can I help you?" }];
 
+      // debounce to avoid hammering API while typing
+      if (this._contextRefreshTimer) clearTimeout(this._contextRefreshTimer);
+      this._contextRefreshTimer = setTimeout(() => {
+        this.refreshContextOptions(newName);
+      }, 250);
+
       if (this.canOperate) this.refreshSessions();
+    },
+
+    contextName(newName) {
+      // keep store in sync if it supports it
+      if (this.store) this.store.contextName = newName;
     },
   },
 
@@ -214,6 +261,29 @@ export default {
         this.agents = agentNames.map(name => ({ name }));
       } catch (error) {
         console.error("Error fetching agent names:", error);
+      }
+    },
+
+    async refreshContextOptions(accountName) {
+      try {
+        const acct = (accountName ?? this.accountName ?? "").trim();
+        if (!acct) {
+          this.contextOptions = [];
+          return;
+        }
+
+        const names = await this.dataService.getContextNames(acct);
+        this.contextOptions = (names || []).filter(Boolean);
+
+        // If user already typed something, keep it even if it's not in list.
+        // If nothing selected yet, default to first option.
+        if (!(this.contextName || "").trim() && this.contextOptions.length) {
+          this.contextName = this.contextOptions[0];
+        }
+      } catch (error) {
+        // Don't block chat if contexts fail to load.
+        console.error("Error fetching context names:", error);
+        this.contextOptions = [];
       }
     },
 
@@ -343,12 +413,16 @@ export default {
       try {
         this.isLoading = true;
 
+        const contextName = (this.contextName || "").trim() || null;
+
         const result = await this.dataService.askQuestionMultiAgent(
           text,
           this.selectedAgent.name,
           this.accountName,
           sessionId,
-          this.selectType
+          this.selectType,
+          null,
+          contextName
         );
 
         this.responses.push({

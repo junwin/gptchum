@@ -11,10 +11,23 @@ class DataService {
     });
   }
 
-  async askQuestion(question, agentName, accountName, conversationId, selectType) {
+  async askQuestion(
+    question,
+    agentName,
+    accountName,
+    conversationId,
+    selectType,
+    contextName
+  ) {
     try {
-      const contextName="lucy_client";
-      const response = await this.apiClient.post("/ask", { question, agentName, accountName, conversationId, selectType, contextName });
+      const response = await this.apiClient.post("/ask", {
+        question,
+        agentName,
+        accountName,
+        conversationId,
+        selectType,
+        contextName,
+      });
       return response.data;
     } catch (error) {
       console.error(error);
@@ -22,24 +35,48 @@ class DataService {
     }
   }
 
-  async askQuestionMultiAgent(question, agentName, accountName, conversationId, selectType, secondaryAgent) {
+  async askQuestionMultiAgent(
+    question,
+    agentName,
+    accountName,
+    conversationId,
+    selectType,
+    secondaryAgent = null,
+    contextName
+  ) {
     try {
-      const contextName="lucy_client";
-      if(agentName == "glinda") {
+      // Previously this method hard-coded secondaryAgent when agentName was
+      // "glinda". That prevented callers from explicitly controlling
+      // secondaryAgent/contextName. Keep backwards compatibility by defaulting
+      // secondaryAgent to "dorothy" only when the caller does not supply one.
+      if (agentName === "glinda" && secondaryAgent == null) {
         secondaryAgent = "dorothy";
-        const response = await this.apiClient.post("/ask", { question, agentName, accountName, conversationId, selectType, secondaryAgent, contextName});
-        return response.data;
-      } else {
-        const response = await this.apiClient.post("/ask", { question, agentName, accountName, conversationId, selectType, contextName});
-        return response.data;
       }
-      
+
+      const payload = {
+        question,
+        agentName,
+        accountName,
+        conversationId,
+        selectType,
+        contextName,
+      };
+
+      // Only include secondaryAgent when present, so the API receives the same
+      // shape as before for single-agent calls.
+      if (secondaryAgent != null) {
+        payload.secondaryAgent = secondaryAgent;
+      }
+
+      const response = await this.apiClient.post("/ask", payload);
+      return response.data;
     } catch (error) {
       console.error(error);
       throw error;
     }
   }
-  // --- Chat sessions (new) ---
+
+  // --- Chat sessions ---
 
   async createChat(agentName, accountName, friendlyName = null, tags = null) {
     try {
@@ -82,7 +119,7 @@ class DataService {
     try {
       const response = await this.apiClient.get("/agents");
       const agents = response.data;
-      const agentNames = agents.map(agent => agent.name);
+      const agentNames = agents.map((agent) => agent.name);
       return agentNames;
     } catch (error) {
       console.error(error);
@@ -90,81 +127,17 @@ class DataService {
     }
   }
 
-  async getPrompts(agentName, accountName, conversationId) {
+  async getContextNames(accountName) {
     try {
-      const response = await this.apiClient.get("/completions", {
-        params: {
-          agentName,
-          accountName,
-          conversationId,
-        },
+      if (accountName == null || String(accountName).trim() === "") {
+        throw new Error("accountName is required");
+      }
+
+      const response = await this.apiClient.get("/context/names", {
+        params: { accountName },
       });
 
-
-      return response.data;
-    } catch (error) {
-      console.error(error);
-      throw error;
-    }
-  }
-
-  async updatePrompt(agentName, accountName, id, prompt) {
-    try {
-      const response = await this.apiClient.put("/completions", prompt, {
-        params: {
-          agentName,
-          accountName,
-          id,
-        },
-      });
-      return response.data;
-    } catch (error) {
-      console.error(error);
-      throw error;
-    }
-  }
-
-  async deletePrompt(agentName, accountName, id) {
-    try {
-      const response = await this.apiClient.delete("/completions", {
-        params: {
-          agentName,
-          accountName,
-          id,
-        },
-      });
-      return response.data;
-    } catch (error) {
-      console.error(error);
-      throw error;
-    }
-  }
-
-  async getConversationIds(agentName, accountName) {
-    try {
-      const response = await this.apiClient.get("/conversationIds", {
-        params: {
-          agentName,
-          accountName,
-        },
-      });
-      return response.data;
-    } catch (error) {
-      console.error(error);
-      throw error;
-    }
-  }
-
-  async renameConversationId(agentName, accountName, existingId, newId) {
-    try {
-      const response = await this.apiClient.put("/conversationIds", null, {
-        params: {
-          agentName,
-          accountName,
-          existingId,
-          newId,
-        },
-      });
+      // Lucy returns a JSON array of strings.
       return response.data;
     } catch (error) {
       console.error(error);
