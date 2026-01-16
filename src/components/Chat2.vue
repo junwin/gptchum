@@ -1,6 +1,6 @@
 <!-- /home/junwin/src/repos/gptchum/src/components/Chat2.vue -->
 <template>
-  <div :class="['app-container', { 'dark-theme': isDarkMode }]">
+  <div class="app-container">
     <div class="toolbar-container">
       <!-- Agent -->
       <div class="p-mr-2">
@@ -76,6 +76,17 @@
       <div class="p-mr-2">
         <Button label="Refresh" @click="refreshSessions" :disabled="!canOperate" />
       </div>
+
+      <!-- Theme toggle (icon button) -->
+      <div class="p-ml-auto">
+        <Button
+          class="p-button-text"
+          :icon="isDarkMode ? 'pi pi-sun' : 'pi pi-moon'"
+          :aria-label="isDarkMode ? 'Switch to light theme' : 'Switch to dark theme'"
+          :title="isDarkMode ? 'Light mode' : 'Dark mode'"
+          @click="toggleTheme"
+        />
+      </div>
     </div>
 
     <!-- Chat window -->
@@ -129,20 +140,6 @@
   font-size: 0.85em;
   opacity: 0.75;
 }
-
-.dark-theme {
-  --bg-color: #1a1a1a;
-  --text-color: #ffffff;
-  --input-bg-color: #ffffff;
-}
-
-@media (prefers-color-scheme: light) {
-  .dark-theme {
-    --bg-color: #ffffff;
-    --text-color: #000000;
-    --input-bg-color: #f2f2f2;
-  }
-}
 </style>
 
 <script>
@@ -187,7 +184,7 @@ export default {
       return !!(this.dataService && this.accountName && this.selectedAgent?.name);
     },
     isDarkMode() {
-      return false;
+      return this.store?.theme === "dark";
     },
   },
 
@@ -255,6 +252,10 @@ export default {
   },
 
   methods: {
+    toggleTheme() {
+      this.store?.toggleTheme?.();
+    },
+
     async fetchAgentNames() {
       try {
         const agentNames = await this.dataService.getAgentNames();
