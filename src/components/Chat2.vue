@@ -224,10 +224,9 @@ export default {
       if (!newAgent) return;
       this.store.agentName = newAgent.name;
 
-      this.selectedSession = null;
-      this.responses = [{ id: "hello", role: "assistant", content: "Hello! How can I help you?" }];
-
-      if (this.canOperate) this.refreshSessions();
+      // Don't reset session or refresh sessions — the chat list is now
+      // account-wide, not agent-specific. The user can keep their current
+      // conversation and just switch which agent responds.
     },
 
     accountName(newName) {
@@ -314,7 +313,7 @@ export default {
       try {
         this.isLoading = true;
 
-        const list = await this.dataService.listChats(this.accountName, this.selectedAgent.name, 50);
+        const list = await this.dataService.listChats(this.accountName, 50);
         this.sessions = list || [];
 
         if (this.sessions.length === 0) {

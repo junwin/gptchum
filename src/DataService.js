@@ -93,10 +93,10 @@ class DataService {
     }
   }
 
-  async listChats(accountName, agentName = null, limit = 50) {
+  async listChats(accountName, limit = 50) {
     try {
       const response = await this.apiClient.get("/chats", {
-        params: { accountName, agentName, limit },
+        params: { accountName, limit },
       });
       return response.data; // array of sessions (summary shape)
     } catch (error) {
