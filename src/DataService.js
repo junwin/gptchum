@@ -17,17 +17,23 @@ class DataService {
     accountName,
     conversationId,
     selectType,
-    contextName
+    contextName,
+    apiKey
   ) {
     try {
-      const response = await this.apiClient.post("/ask", {
+      const payload = {
         question,
         agentName,
         accountName,
         conversationId,
         selectType,
         contextName,
-      });
+      };
+      const headers = {};
+      if (apiKey) {
+        headers["X-API-Key"] = apiKey;
+      }
+      const response = await this.apiClient.post("/ask", payload, { headers });
       return response.data;
     } catch (error) {
       console.error(error);
@@ -42,7 +48,8 @@ class DataService {
     conversationId,
     selectType,
     secondaryAgent = null,
-    contextName
+    contextName,
+    apiKey
   ) {
     try {
       // Previously this method hard-coded secondaryAgent when agentName was
@@ -68,7 +75,12 @@ class DataService {
         payload.secondaryAgent = secondaryAgent;
       }
 
-      const response = await this.apiClient.post("/ask", payload);
+      const headers = {};
+      if (apiKey) {
+        headers["X-API-Key"] = apiKey;
+      }
+
+      const response = await this.apiClient.post("/ask", payload, { headers });
       return response.data;
     } catch (error) {
       console.error(error);

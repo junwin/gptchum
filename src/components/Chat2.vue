@@ -31,6 +31,18 @@
         />
       </div>
 
+      <!-- API Key -->
+      <div class="p-mr-2">
+        <InputText
+          type="password"
+          id="apiKey"
+          v-model="apiKey"
+          placeholder="API Key (optional)"
+          class="api-key-input"
+          @blur="onApiKeyBlur"
+        />
+      </div>
+
       <!-- Chat selector (OBJECT-based, stable via dataKey) -->
       <div class="p-mr-2">
         <Dropdown
@@ -127,6 +139,10 @@
   min-width: 220px;
 }
 
+.api-key-input {
+  min-width: 200px;
+}
+
 .session-option {
   display: flex;
   flex-direction: column;
@@ -163,6 +179,9 @@ export default {
       contextName: "",
       contextOptions: [],
 
+      // API key (optional, per-request override)
+      apiKey: "",
+
       isLoading: false,
 
       sessions: [],
@@ -198,6 +217,9 @@ export default {
     // load persisted context if present
     // (do not require store support; keep local state stable)
     this.contextName = this.store.getContextName || "";
+
+    // load persisted API key if present
+    this.apiKey = this.store.getApiKey || "";
 
     await this.fetchAgentNames();
 
@@ -255,6 +277,13 @@ export default {
       this.store?.toggleTheme?.();
     },
 
+    onApiKeyBlur() {
+      // Persist API key to store when user leaves the field
+      if (this.store) {
+        this.store.setApiKey(this.apiKey);
+      }
+    },
+
     async fetchAgentNames() {
       try {
         const agentNames = await this.dataService.getAgentNames();
@@ -289,7 +318,7 @@ export default {
 
     onSessionChange(e) {
       // PrimeVue gives you the *actual selected object* here.
-      // This also avoids any “watcher got old value” weirdness.
+      // This also avoids any "watcher got old value" weirdness.
       const s = e?.value;
       if (!s?.id) return;
       this.loadChat(s.id);
@@ -414,6 +443,7 @@ export default {
         this.isLoading = true;
 
         const contextName = (this.contextName || "").trim() || null;
+        const apiKey = (this.apiKey || "").trim() || null;
 
         const result = await this.dataService.askQuestionMultiAgent(
           text,
@@ -422,7 +452,8 @@ export default {
           sessionId,
           this.selectType,
           null,
-          contextName
+          contextName,
+          apiKey
         );
 
         this.responses.push({

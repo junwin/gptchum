@@ -12,6 +12,7 @@ const ds = new DataService(baseUrl);
 
 const THEME_KEY = 'gptchum_theme';
 const CONTEXT_KEY = 'gptchum_context';
+const API_KEY_KEY = 'gptchum_api_key';
 
 function applyThemeToDocument(theme) {
     if (typeof document === 'undefined') return;
@@ -31,11 +32,14 @@ export const useSettingStore = defineStore('settings', {
         // read persisted values (if present)
         let persistedTheme = 'light';
         let persistedContext = '';
+        let persistedApiKey = '';
         try {
             const t = localStorage.getItem(THEME_KEY);
             if (t === 'dark' || t === 'light') persistedTheme = t;
             const c = localStorage.getItem(CONTEXT_KEY);
             if (c) persistedContext = c;
+            const k = localStorage.getItem(API_KEY_KEY);
+            if (k) persistedApiKey = k;
         } catch (e) {
             // ignore (e.g., SSR or private mode)
         }
@@ -52,6 +56,8 @@ export const useSettingStore = defineStore('settings', {
             accountName: 'test',
             // Selected or typed context name used for Lucy requests.
             contextName: persistedContext,
+            // API key override sent with each request
+            apiKey: persistedApiKey,
             // theme: 'light' | 'dark'
             theme: persistedTheme,
         };
@@ -72,6 +78,9 @@ export const useSettingStore = defineStore('settings', {
         getContextName(state) {
             return state.contextName;
         },
+        getApiKey(state) {
+            return state.apiKey;
+        },
         getTheme(state) {
             return state.theme;
         },
@@ -90,6 +99,14 @@ export const useSettingStore = defineStore('settings', {
             this.contextName = newContextName || '';
             try {
                 localStorage.setItem(CONTEXT_KEY, this.contextName);
+            } catch (e) {
+                // ignore storage errors
+            }
+        },
+        setApiKey(newApiKey) {
+            this.apiKey = newApiKey || '';
+            try {
+                localStorage.setItem(API_KEY_KEY, this.apiKey);
             } catch (e) {
                 // ignore storage errors
             }
