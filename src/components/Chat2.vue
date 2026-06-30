@@ -13,12 +13,6 @@
         />
       </div>
 
-      <!-- Account -->
-      <span class="p-float-label p-mr-2">
-        <label for="accountName">Account Name:</label>
-        <InputText type="text" id="accountName" v-model="accountName" />
-      </span>
-
       <!-- Context -->
       <div class="p-mr-2">
         <Dropdown
@@ -28,18 +22,6 @@
           editable
           placeholder="default"
           class="context-dropdown"
-        />
-      </div>
-
-      <!-- API Key -->
-      <div class="p-mr-2">
-        <InputText
-          type="password"
-          id="apiKey"
-          v-model="apiKey"
-          placeholder="API Key (optional)"
-          class="api-key-input"
-          @blur="onApiKeyBlur"
         />
       </div>
 
@@ -89,6 +71,16 @@
         <Button label="Refresh" @click="refreshSessions" :disabled="!canOperate" />
       </div>
 
+      <!-- Preferences button -->
+      <div class="p-mr-2">
+        <Button
+          icon="pi pi-cog"
+          class="p-button-rounded p-button-text"
+          @click="openPrefs"
+          :title="'Lucy Endpoint: ' + (store?.serviceBaseUrl || 'not set')"
+        />
+      </div>
+
       <!-- Theme toggle (icon button) -->
       <div class="p-ml-auto">
         <Button
@@ -100,6 +92,50 @@
         />
       </div>
     </div>
+
+    <!-- Preferences Dialog -->
+    <Dialog
+      v-model:visible="showPrefs"
+      header="Preferences"
+      :modal="true"
+      :closable="true"
+      :style="{ width: '450px' }"
+    >
+      <div class="prefs-form">
+        <div class="field">
+          <label for="prefEndpoint">Lucy Endpoint URL</label>
+          <InputText
+            id="prefEndpoint"
+            v-model="prefEndpoint"
+            class="w-full"
+            placeholder="http://localhost:5000"
+          />
+        </div>
+        <div class="field">
+          <label for="prefApiKey">API Key</label>
+          <InputText
+            id="prefApiKey"
+            v-model="prefApiKey"
+            type="password"
+            class="w-full"
+            placeholder="Optional API key"
+          />
+        </div>
+        <div class="field">
+          <label for="prefAccount">Account Name</label>
+          <InputText
+            id="prefAccount"
+            v-model="prefAccount"
+            class="w-full"
+            placeholder="e.g. junwin"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Cancel" @click="showPrefs = false" class="p-button-text" />
+        <Button label="Save" @click="savePrefs" />
+      </template>
+    </Dialog>
 
     <!-- Chat window -->
     <div class="p-mr-2">
@@ -139,10 +175,6 @@
   min-width: 220px;
 }
 
-.api-key-input {
-  min-width: 200px;
-}
-
 .session-option {
   display: flex;
   flex-direction: column;
@@ -155,6 +187,21 @@
 .session-meta {
   font-size: 0.85em;
   opacity: 0.75;
+}
+
+.prefs-form .field {
+  margin-bottom: 1rem;
+}
+
+.prefs-form label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.w-full {
+  width: 100%;
 }
 </style>
 
@@ -174,8 +221,6 @@ export default {
       accountName: "",
 
       // Context
-      // - contextName is user-entered state; it is passed through to DataService
-      // - contextOptions is loaded per-account via dataService.getContextNames(accountName)
       contextName: "",
       contextOptions: [],
 
@@ -185,7 +230,7 @@ export default {
       isLoading: false,
 
       sessions: [],
-      selectedSession: null, // ✅ bind Dropdown to OBJECT (stable via dataKey)
+      selectedSession: null,
 
       selectType: "",
       dataService: null,
@@ -195,6 +240,12 @@ export default {
 
       // simple debounce for accountName -> refreshContextOptions
       _contextRefreshTimer: null,
+
+      // Preferences dialog
+      showPrefs: false,
+      prefEndpoint: "",
+      prefApiKey: "",
+      prefAccount: "",
     };
   },
 
@@ -215,7 +266,6 @@ export default {
     this.accountName = this.store.getAccountName || "";
 
     // load persisted context if present
-    // (do not require store support; keep local state stable)
     this.contextName = this.store.getContextName || "";
 
     // load persisted API key if present
@@ -245,10 +295,6 @@ export default {
     selectedAgent(newAgent) {
       if (!newAgent) return;
       this.store.agentName = newAgent.name;
-
-      // Don't reset session or refresh sessions — the chat list is now
-      // account-wide, not agent-specific. The user can keep their current
-      // conversation and just switch which agent responds.
     },
 
     accountName(newName) {
@@ -267,7 +313,6 @@ export default {
     },
 
     contextName(newName) {
-      // keep store in sync if it supports it
       if (this.store) this.store.contextName = newName;
     },
   },
@@ -277,11 +322,34 @@ export default {
       this.store?.toggleTheme?.();
     },
 
-    onApiKeyBlur() {
-      // Persist API key to store when user leaves the field
+    // --- Preferences ---
+    openPrefs() {
+      this.prefEndpoint = this.store?.serviceBaseUrl || "http://localhost:5000";
+      this.prefApiKey = this.store?.apiKey || "";
+      this.prefAccount = this.store?.accountName || "";
+      this.showPrefs = true;
+    },
+
+    savePrefs() {
+      // Save endpoint URL (recreates DataService)
       if (this.store) {
-        this.store.setApiKey(this.apiKey);
+        this.store.setServiceBaseUrl(this.prefEndpoint);
+        this.store.setApiKey(this.prefApiKey);
+        this.store.setAccountName(this.prefAccount);
       }
+
+      // Update local references
+      this.dataService = this.store?.dataService;
+      this.accountName = this.prefAccount;
+      this.apiKey = this.prefApiKey;
+
+      // Refresh agents and sessions with new endpoint
+      this.fetchAgentNames();
+      if (this.canOperate) {
+        this.refreshSessions();
+      }
+
+      this.showPrefs = false;
     },
 
     async fetchAgentNames() {
@@ -304,21 +372,16 @@ export default {
         const names = await this.dataService.getContextNames(acct);
         this.contextOptions = (names || []).filter(Boolean);
 
-        // If user already typed something, keep it even if it's not in list.
-        // If nothing selected yet, default to first option.
         if (!(this.contextName || "").trim() && this.contextOptions.length) {
           this.contextName = this.contextOptions[0];
         }
       } catch (error) {
-        // Don't block chat if contexts fail to load.
         console.error("Error fetching context names:", error);
         this.contextOptions = [];
       }
     },
 
     onSessionChange(e) {
-      // PrimeVue gives you the *actual selected object* here.
-      // This also avoids any "watcher got old value" weirdness.
       const s = e?.value;
       if (!s?.id) return;
       this.loadChat(s.id);
@@ -351,13 +414,11 @@ export default {
           return;
         }
 
-        // keep currently selected session by id (NOT by index / object identity)
         const currentId = this.selectedSession?.id;
         const stillThere = currentId ? this.sessions.find(s => s.id === currentId) : null;
 
         this.selectedSession = stillThere || this.sessions[0];
 
-        // load selected
         await this.loadChat(this.selectedSession.id);
       } catch (error) {
         console.error("Error refreshing sessions:", error);
@@ -401,7 +462,6 @@ export default {
           null
         );
 
-        // select it as an object (best effort until refresh pulls full session objects)
         this.selectedSession = { id: session.id, friendly_name: friendlyName || session.id };
 
         await this.refreshSessions();
@@ -414,7 +474,6 @@ export default {
       const text = (message?.content || "").trim();
       if (!text) return;
 
-      // wait for selection + any chat load to settle
       await this.$nextTick();
       while (this.isLoadingChat) {
         await new Promise(resolve => setTimeout(resolve, 25));
@@ -423,7 +482,6 @@ export default {
       let sessionId = this.selectedSession?.id;
 
       if (!sessionId) {
-        // auto-create chat if none selected
         const friendlyName = window.prompt("Chat name?", "tuesday");
         const session = await this.dataService.createChat(
           this.selectedAgent.name,
@@ -462,7 +520,6 @@ export default {
           content: result?.response ?? "",
         });
 
-        // reconcile from server
         setTimeout(async () => {
           await this.loadChat(sessionId);
           await this.refreshSessions();
