@@ -6,6 +6,7 @@ const isProd = process.env.NODE_ENV === 'production';
 const DEFAULT_BASE_URL = 'http://localhost:5000';
 
 const THEME_KEY = 'gptchum_theme';
+const AGENT_KEY = 'gptchum_agent';
 const CONTEXT_KEY = 'gptchum_context';
 const API_KEY_KEY = 'gptchum_api_key';
 const BASE_URL_KEY = 'gptchum_base_url';
@@ -60,7 +61,7 @@ export const useSettingStore = defineStore('settings', {
             environment: process.env.NODE_ENV,
             serviceBaseUrl: savedBaseUrl,
             dataService: ds,
-            agentName: 'lucy',
+            agentName: loadString(AGENT_KEY, 'lucy'),
             accountName: loadString(ACCOUNT_KEY),
             contextName: loadString(CONTEXT_KEY),
             apiKey: loadString(API_KEY_KEY),
@@ -98,7 +99,8 @@ export const useSettingStore = defineStore('settings', {
             this.dataService = newDataService;
         },
         setAgentName(newAgentName) {
-            this.agentName = newAgentName;
+            this.agentName = newAgentName || 'lucy';
+            saveString(AGENT_KEY, this.agentName);
         },
         setAccountName(newAccountName) {
             this.accountName = newAccountName || '';
