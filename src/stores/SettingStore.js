@@ -54,7 +54,8 @@ export const useSettingStore = defineStore('settings', {
         applyThemeToDocument(persistedTheme);
 
         const savedBaseUrl = loadString(BASE_URL_KEY, DEFAULT_BASE_URL);
-        const ds = new DataService(savedBaseUrl);
+        const savedApiKey = loadString(API_KEY_KEY);
+        const ds = new DataService(savedBaseUrl, savedApiKey);
 
         return {
             version: '1.0.0',
@@ -64,7 +65,7 @@ export const useSettingStore = defineStore('settings', {
             agentName: loadString(AGENT_KEY, 'lucy'),
             accountName: loadString(ACCOUNT_KEY),
             contextName: loadString(CONTEXT_KEY),
-            apiKey: loadString(API_KEY_KEY),
+            apiKey: savedApiKey,
             theme: persistedTheme,
         };
     },
@@ -118,8 +119,8 @@ export const useSettingStore = defineStore('settings', {
             const url = (newUrl || '').trim() || DEFAULT_BASE_URL;
             this.serviceBaseUrl = url;
             saveString(BASE_URL_KEY, url);
-            // Recreate the data service with the new URL
-            this.dataService = new DataService(url);
+            // Recreate the data service with the new URL, preserving the API key
+            this.dataService = new DataService(url, this.apiKey);
         },
         setTheme(newTheme) {
             if (newTheme !== 'light' && newTheme !== 'dark') return;

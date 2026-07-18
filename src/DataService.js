@@ -1,7 +1,7 @@
 import axios from "axios";
 
 class DataService {
-  constructor(baseUrl) {
+  constructor(baseUrl, apiKey = "") {
     this.apiClient = axios.create({
       baseURL: baseUrl,
       headers: {
@@ -9,6 +9,14 @@ class DataService {
         "Content-Type": "application/json",
       },
     });
+
+    // Attach X-API-Key to every request when an API key is configured
+    if (apiKey && apiKey.trim()) {
+      this.apiClient.interceptors.request.use((config) => {
+        config.headers["X-API-Key"] = apiKey;
+        return config;
+      });
+    }
   }
 
   async askQuestion(
