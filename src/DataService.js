@@ -2,6 +2,9 @@ import axios from "axios";
 
 class DataService {
   constructor(baseUrl, apiKey = "") {
+    this.baseUrl = baseUrl;
+    this.apiKey = apiKey;
+
     this.apiClient = axios.create({
       baseURL: baseUrl,
       headers: {
@@ -93,6 +96,71 @@ class DataService {
     } catch (error) {
       console.error(error);
       throw error;
+    }
+  }
+
+  // --- SSE Streaming ---
+
+  async *askQuestionStreaming(
+    question,
+    agentName,
+    accountName,
+    conversationId,
+    contextName
+  ) {
+    const key = this.apiKey || "";
+    const headers = {
+      "Content-Type": "application/json",
+    };
+    if (key) {
+      headers["X-API-Key"] = key;
+    }
+
+    const response = await fetch(`${this.baseUrl}/ask`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        question,
+        agentName,
+        accountName,
+        conversationId,
+        contextName,
+        stream: true,
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`/ask failed: ${response.status} ${err}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Split on SSE frame boundary: "\n\n"
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop(); // keep incomplete last chunk
+
+      for (const part of parts) {
+        const lines = part.split("\n");
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const json = line.slice(6);
+            try {
+              yield JSON.parse(json);
+            } catch (e) {
+              console.warn("Failed to parse SSE event:", json, e);
+            }
+          }
+        }
+      }
     }
   }
 

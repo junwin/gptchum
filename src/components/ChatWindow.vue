@@ -5,13 +5,46 @@
         v-for="message in currentMessages"
         :key="message.id || message.utc_timestamp || message.content"
         class="card"
+        :class="cardClass(message)"
       >
-        <div class="participant-name">
-          {{ message.role === userName ? userName : assistantName }}
-        </div>
+        <!-- Tool card -->
+        <template v-if="message.kind === 'tool'">
+          <div class="participant-name tool-label">
+            <span class="tool-icon">{{ toolIcon(message) }}</span>
+            {{ message.tool_name || 'Tool' }}
+          </div>
+          <div class="message tool-card">
+            <span class="tool-status">{{ message.content }}</span>
+          </div>
+        </template>
 
-        <!-- Local SafeMarkdown overrides global one so we can add copy buttons to code blocks -->
-        <SafeMarkdown class="message" :source="message.content" />
+        <!-- Image card -->
+        <template v-else-if="message.kind === 'image'">
+          <div class="participant-name">
+            {{ message.role === userName ? userName : assistantName }}
+          </div>
+          <div class="message image-card">
+            <img
+              v-if="message.image_url"
+              :src="message.image_url"
+              :alt="message.alt || 'Image'"
+              class="chat-image"
+            />
+            <span v-if="message.alt" class="image-alt">{{ message.alt }}</span>
+          </div>
+        </template>
+
+        <!-- Text card (default) -->
+        <template v-else>
+          <div class="participant-name">
+            {{ message.role === userName ? userName : assistantName }}
+            <span v-if="message.isStreaming" class="streaming-dots">
+              <span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>
+            </span>
+          </div>
+          <SafeMarkdown class="message" :source="message.content" />
+          <div v-if="message.error" class="error-badge">Error</div>
+        </template>
       </div>
     </ScrollPanel>
 
@@ -35,15 +68,11 @@ export default {
   props: {
     assistantName: String,
     userName: String,
-    conversationId: String, // this will be the GUID session id now
+    conversationId: String,
     contextName: String,
     currentMessages: Array,
   },
   components: {
-    // Local SafeMarkdown component uses the app's configured markdown-it renderer
-    // (registered on app.config.globalProperties.$md in main.js). We render with v-html
-    // (markdown-it is configured with html: false) and then enhance code blocks by
-    // adding a copy button overlay per <pre>.
     SafeMarkdown: {
       props: ["source"],
       setup(props) {
@@ -57,10 +86,7 @@ export default {
 
           const pres = el.querySelectorAll("pre");
           pres.forEach((pre) => {
-            // avoid adding multiple buttons
             if (pre.querySelector('.code-copy-button')) return;
-
-            // make sure pre is positioned so the button can be absolutely placed
             pre.style.position = pre.style.position || "relative";
 
             const btn = document.createElement("button");
@@ -76,7 +102,6 @@ export default {
                 if (navigator.clipboard && navigator.clipboard.writeText) {
                   await navigator.clipboard.writeText(text);
                 } else {
-                  // fallback
                   const textarea = document.createElement("textarea");
                   textarea.value = text;
                   textarea.style.position = "fixed";
@@ -96,22 +121,16 @@ export default {
               }
             });
 
-            // place button into pre
             pre.appendChild(btn);
           });
         };
 
-        // expose render function
         return () => {
           const html = md ? md.render(props.source || "") : (props.source || "");
-          // we must set innerHTML; markdown-it is configured with html: false in main.js
-          // so raw HTML in the source will be escaped. We then run a small enhancement to
-          // add copy buttons. Because we manipulate DOM directly, we use nextTick to add buttons.
           return h('div', {
             class: 'safe-markdown',
             innerHTML: html,
             ref: containerRef,
-            // after vnode mounted we need to schedule copy button addition
             onVnodeMounted: () => { nextTick(addCopyButtons); },
             onVnodeUpdated: () => { nextTick(addCopyButtons); }
           });
@@ -143,15 +162,28 @@ export default {
       scrollToBottom();
     };
 
+    const cardClass = (message) => {
+      if (message.kind === "tool") return "card-tool";
+      if (message.kind === "image") return "card-image";
+      if (message.error) return "card-error";
+      if (message.isStreaming) return "card-streaming";
+      return "";
+    };
+
+    const toolIcon = (message) => {
+      if (message.ok === true) return "\u2705";  // checkmark
+      if (message.ok === false) return "\u274C"; // cross
+      return "\u23F3"; // hourglass (in progress)
+    };
+
     onMounted(scrollToBottom);
 
-    // keep view pinned to bottom when parent loads new history
     watch(
       () => props.currentMessages?.length,
       () => scrollToBottom()
     );
 
-    return { inputText, cardStack, sendMessage };
+    return { inputText, cardStack, sendMessage, cardClass, toolIcon };
   },
 };
 </script>
@@ -193,6 +225,89 @@ export default {
   color: var(--text-color, #111827);
 }
 
+/* Tool cards */
+.card-tool .tool-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85rem;
+  color: var(--text-color-secondary, #6b7280);
+}
+
+.tool-icon {
+  display: inline-block;
+  width: 1.2em;
+  margin-right: 4px;
+}
+
+.tool-card {
+  background: var(--surface-ground, #f3f4f6) !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85rem;
+  color: var(--text-color-secondary, #6b7280);
+  padding: 6px 12px !important;
+}
+
+.tool-status {
+  opacity: 0.85;
+}
+
+/* Image cards */
+.card-image .image-card {
+  padding: 4px !important;
+  border: 1px solid var(--surface-border, #d3d3d3);
+}
+
+.chat-image {
+  max-width: 100%;
+  max-height: 400px;
+  border-radius: 4px;
+  display: block;
+}
+
+.image-alt {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-color-secondary, #6b7280);
+  margin-top: 4px;
+}
+
+/* Streaming indicator */
+.streaming-dots .dot {
+  animation: blink 1.4s infinite both;
+  font-weight: bold;
+  font-size: 1.2rem;
+  color: var(--primary-color, #3b82f6);
+}
+
+.streaming-dots .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.streaming-dots .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes blink {
+  0%, 80%, 100% { opacity: 0; }
+  40% { opacity: 1; }
+}
+
+/* Error badge */
+.error-badge {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #fee2e2;
+  color: #dc2626;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.card-error .message {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
 /* Make markdown look decent */
 .card .message :deep(p) {
   margin: 0 0 0.75rem 0;
@@ -206,7 +321,7 @@ export default {
   overflow: auto;
   padding: 0.75rem;
   border-radius: 6px;
-  position: relative; /* allow absolute button inside */
+  position: relative;
   background: var(--surface-code-bg, #0b1220);
 }
 
@@ -214,7 +329,6 @@ export default {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
-/* Highlight.js default styles are loaded globally (github.css). Provide small tweaks for dark backgrounds */
 .card .message :deep(pre.hljs) {
   background: var(--surface-code-bg, #0b1220);
   color: var(--text-color, #e6edf3);
@@ -222,7 +336,6 @@ export default {
   border-radius: 6px;
 }
 
-/* Copy button overlay */
 .card .message :deep(.code-copy-button) {
   position: absolute;
   top: 8px;

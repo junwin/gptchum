@@ -494,43 +494,111 @@ export default {
         await this.refreshSessions();
       }
 
-      // optimistic UI
-      this.responses.push({ id: `u_${Date.now()}`, role: this.accountName, content: text });
+      // Add user message card
+      this.responses.push({ id: `u_${Date.now()}`, role: this.accountName, kind: "text", content: text });
+
+      // Add placeholder assistant card
+      const assistantCard = {
+        id: `a_${Date.now()}`,
+        role: this.selectedAgent.name,
+        kind: "text",
+        content: "",
+        isStreaming: true,
+      };
+      this.responses.push(assistantCard);
+
+      const contextName = (this.contextName || "").trim() || null;
 
       try {
         this.isLoading = true;
 
-        const contextName = (this.contextName || "").trim() || null;
-        const apiKey = (this.apiKey || "").trim() || null;
-
-        const result = await this.dataService.askQuestionMultiAgent(
+        const stream = this.dataService.askQuestionStreaming(
           text,
           this.selectedAgent.name,
           this.accountName,
           sessionId,
-          this.selectType,
-          null,
           contextName,
-          apiKey
         );
 
-        this.responses.push({
-          id: `a_${Date.now()}`,
-          role: this.selectedAgent.name,
-          content: result?.response ?? "",
-        });
+        for await (const event of stream) {
+          switch (event.type) {
+            case "tool_call":
+              this.responses.push({
+                id: `tc_${event.call_id || Date.now()}`,
+                role: "tool",
+                kind: "tool",
+                content: `Calling ${event.tool_name}...`,
+                call_id: event.call_id,
+                tool_name: event.tool_name,
+                ok: null,
+              });
+              break;
 
+            case "tool_result":
+              const toolCard = this.responses.find(
+                m => m.kind === "tool" && m.call_id === event.call_id
+              );
+              if (toolCard) {
+                toolCard.ok = event.ok;
+                toolCard.content = event.ok ? "Done" : "Failed";
+              }
+              break;
+
+            case "text":
+              if (assistantCard.message_id === event.message_id) {
+                // Update in-place (future word streaming)
+                assistantCard.content += event.content;
+              } else {
+                assistantCard.content = event.content;
+                assistantCard.message_id = event.message_id;
+              }
+              break;
+
+            case "image":
+              this.responses.push({
+                id: `img_${Date.now()}`,
+                role: this.selectedAgent.name,
+                kind: "image",
+                image_url: event.image_url,
+                alt: event.alt || "",
+              });
+              break;
+
+            case "action":
+              if (event.action === "reset_session") {
+                this.selectedSession = null;
+                this.responses = [];
+              }
+              break;
+
+            case "done":
+              assistantCard.isStreaming = false;
+              this.selectedSession = {
+                ...this.selectedSession,
+                id: event.conversation_id || this.selectedSession?.id,
+              };
+              break;
+
+            case "error":
+              assistantCard.isStreaming = false;
+              assistantCard.content = event.message || "An error occurred";
+              assistantCard.error = true;
+              break;
+          }
+
+          // scroll handled by ChatWindow watch
+        }
+
+        // Refresh sessions after streaming completes
         setTimeout(async () => {
           await this.loadChat(sessionId);
           await this.refreshSessions();
         }, 150);
-      } catch (error) {
-        console.error("Ask failed:", error);
-        this.responses.push({
-          id: `e_${Date.now()}`,
-          role: this.selectedAgent.name,
-          content: "Error occurred while processing the question.",
-        });
+      } catch (err) {
+        console.error("Streaming ask failed:", err);
+        assistantCard.isStreaming = false;
+        assistantCard.content = `Connection error: ${err.message}`;
+        assistantCard.error = true;
       } finally {
         this.isLoading = false;
       }
