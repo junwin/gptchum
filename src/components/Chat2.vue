@@ -568,6 +568,13 @@ export default {
               if (event.action === "reset_session") {
                 this.selectedSession = null;
                 this.responses = [];
+                await this.refreshSessions();
+              } else if (event.action === "redirect") {
+                const targetId = event.action_payload?.target_session_id;
+                if (targetId) {
+                  await this.loadSession(targetId);
+                  await this.refreshSessions();
+                }
               }
               break;
 
