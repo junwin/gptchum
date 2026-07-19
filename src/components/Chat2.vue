@@ -427,6 +427,115 @@ export default {
       }
     },
 
+    _parseContent(content) {
+      // Try to parse content as JSON for structured payloads (images, etc).
+      // Returns the parsed object on success, or the raw string on failure.
+      if (typeof content !== "string") return content;
+      try {
+        return JSON.parse(content);
+      } catch {
+        return content;
+      }
+    },
+
+    _mapMessageToCard(m, idx) {
+      const kind = m.kind || (m.role === "assistant" ? "assistant_message" : m.role === "user" ? "user_message" : m.role);
+      const parsed = this._parseContent(m.content);
+
+      switch (kind) {
+        case "user_message":
+          return {
+            id: m.utc_timestamp || `u_${idx}`,
+            role: this.accountName,
+            kind: "text",
+            content: typeof parsed === "string" ? parsed : JSON.stringify(parsed),
+          };
+
+        case "assistant_message":
+          return {
+            id: m.utc_timestamp || `a_${idx}`,
+            role: this.selectedAgent?.name || "assistant",
+            kind: "text",
+            content: typeof parsed === "string" ? parsed : JSON.stringify(parsed),
+          };
+
+        case "generated_image":
+          return {
+            id: m.utc_timestamp || `img_${idx}`,
+            role: this.selectedAgent?.name || "assistant",
+            kind: "image",
+            image_url: parsed?.image_url || m.content,
+            alt: parsed?.alt || "",
+          };
+
+        case "assistant_tool_call": {
+          const toolName = parsed?.tool_name || "unknown";
+          const callId = parsed?.call_id || `tc_${idx}`;
+          return {
+            id: m.utc_timestamp || `tc_${idx}`,
+            role: "tool",
+            kind: "tool",
+            content: `Calling ${toolName}...`,
+            call_id: callId,
+            tool_name: toolName,
+            ok: null,
+          };
+        }
+
+        case "tool_result": {
+          const callId = parsed?.call_id || "";
+          const ok = parsed?.ok;
+          return {
+            id: m.utc_timestamp || `tr_${idx}`,
+            role: "tool",
+            kind: "tool_result_update",
+            call_id: callId,
+            ok: ok,
+          };
+        }
+
+        case "summary":
+        case "system_note":
+          // Skip non-display events
+          return null;
+
+        default:
+          // Fallback: treat as text
+          return {
+            id: m.utc_timestamp || `msg_${idx}`,
+            role: m.role === "assistant" ? (this.selectedAgent?.name || "assistant") : this.accountName,
+            kind: "text",
+            content: typeof parsed === "string" ? parsed : JSON.stringify(parsed),
+          };
+      }
+    },
+
+    _postProcessCards(cards) {
+      // Merge tool_result updates into their preceding tool_call cards.
+      const result = [];
+      const toolCardsByCallId = {};
+
+      for (const card of cards) {
+        if (!card) continue;
+
+        if (card.kind === "tool") {
+          result.push(card);
+          toolCardsByCallId[card.call_id] = card;
+        } else if (card.kind === "tool_result_update") {
+          const toolCard = toolCardsByCallId[card.call_id];
+          if (toolCard) {
+            toolCard.ok = card.ok;
+            toolCard.content = card.ok ? "Done" : "Failed";
+          }
+          // Don't add the result card itself
+        } else {
+          result.push(card);
+        }
+      }
+
+      return result;
+    },
+
     async loadChat(sessionId) {
       try {
         if (!sessionId) return;
@@ -434,15 +543,12 @@ export default {
 
         const chat = await this.dataService.getChat(sessionId);
 
-        const msgs = (chat.messages || []).map((m, idx) => ({
-          id: m.utc_timestamp || `${idx}`,
-          role: m.role === "assistant" ? this.selectedAgent.name : this.accountName,
-          content: m.content,
-        }));
+        const cards = (chat.messages || []).map((m, idx) => this._mapMessageToCard(m, idx));
+        const msgs = this._postProcessCards(cards);
 
         this.responses = msgs.length
           ? msgs
-          : [{ id: "hello", role: this.selectedAgent.name, content: "Hello! How can I help you?" }];
+          : [{ id: "hello", role: this.selectedAgent?.name || "assistant", content: "Hello! How can I help you?" }];
       } catch (error) {
         console.error("Error loading chat:", error);
       } finally {
@@ -572,7 +678,7 @@ export default {
               } else if (event.action === "redirect") {
                 const targetId = event.action_payload?.target_session_id;
                 if (targetId) {
-                  await this.loadSession(targetId);
+                  await this.loadChat(targetId);
                   await this.refreshSessions();
                 }
               }
