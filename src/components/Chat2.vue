@@ -459,14 +459,33 @@ export default {
             content: typeof parsed === "string" ? parsed : JSON.stringify(parsed),
           };
 
-        case "generated_image":
+        case "generated_image": {
+          const fmt = parsed?.format || "png";
+          if (fmt === "svg") {
+            // SVG: build a data URI from svg_markup
+            const svgMarkup = parsed?.svg_markup || "";
+            const encoded = encodeURIComponent(svgMarkup);
+            return {
+              id: m.utc_timestamp || `img_${idx}`,
+              role: this.selectedAgent?.name || "assistant",
+              kind: "image",
+              image_url: `data:image/svg+xml,${encoded}`,
+              alt: parsed?.alt || "",
+              format: "svg",
+              width: parsed?.width,
+              height: parsed?.height,
+            };
+          }
+          // PNG / default
           return {
             id: m.utc_timestamp || `img_${idx}`,
             role: this.selectedAgent?.name || "assistant",
             kind: "image",
             image_url: parsed?.image_url || m.content,
             alt: parsed?.alt || "",
+            format: "png",
           };
+        }
 
         case "assistant_tool_call": {
           const toolName = parsed?.tool_name || "unknown";
@@ -660,15 +679,35 @@ export default {
               }
               break;
 
-            case "image":
-              this.responses.push({
-                id: `img_${Date.now()}`,
-                role: this.selectedAgent.name,
-                kind: "image",
-                image_url: event.image_url,
-                alt: event.alt || "",
-              });
+            case "image": {
+              const fmt = event.format || "png";
+              if (fmt === "svg") {
+                // Build data URI from raw SVG markup
+                const svgMarkup = event.svg_markup || "";
+                const encoded = encodeURIComponent(svgMarkup);
+                this.responses.push({
+                  id: `img_${Date.now()}`,
+                  role: this.selectedAgent.name,
+                  kind: "image",
+                  image_url: `data:image/svg+xml,${encoded}`,
+                  alt: event.alt || "",
+                  format: "svg",
+                  width: event.width,
+                  height: event.height,
+                });
+              } else {
+                // PNG
+                this.responses.push({
+                  id: `img_${Date.now()}`,
+                  role: this.selectedAgent.name,
+                  kind: "image",
+                  image_url: event.image_url,
+                  alt: event.alt || "",
+                  format: "png",
+                });
+              }
               break;
+            }
 
             case "action":
               if (event.action === "reset_session") {
