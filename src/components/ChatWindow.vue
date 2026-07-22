@@ -48,7 +48,39 @@
       </div>
     </ScrollPanel>
 
+    <!-- Attachment previews -->
+    <div class="attachments-row" v-if="attachments.length">
+      <div
+        v-for="(att, idx) in attachments"
+        :key="idx"
+        class="attachment-chip"
+        :title="att.file.name"
+      >
+        <img v-if="isImageFile(att.file)" :src="att.preview" class="attachment-thumb" />
+        <span v-else class="attachment-file-icon">📄</span>
+        <span class="attachment-name">{{ att.file.name }}</span>
+        <button class="attachment-remove" @click="removeAttachment(idx)" type="button">&times;</button>
+      </div>
+    </div>
+
     <div class="input-box">
+      <!-- Hidden file input -->
+      <input
+        ref="fileInput"
+        type="file"
+        accept="image/*,.md,.txt"
+        multiple
+        class="file-input-hidden"
+        @change="addFiles"
+      />
+
+      <Button
+        icon="pi pi-paperclip"
+        class="p-button-text attach-btn"
+        title="Attach file"
+        @click="openFilePicker"
+      />
+
       <Textarea
         v-model="inputText"
         placeholder="Enter your message"
@@ -141,6 +173,8 @@ export default {
   setup(props, { emit }) {
     const inputText = ref("");
     const cardStack = ref(null);
+    const fileInput = ref(null);
+    const attachments = ref([]);
 
     const scrollToBottom = () => {
       nextTick(() => {
@@ -149,15 +183,50 @@ export default {
       });
     };
 
+    const openFilePicker = () => {
+      fileInput.value?.click();
+    };
+
+    const isImageFile = (file) => {
+      return file.type && file.type.startsWith("image/");
+    };
+
+    const addFiles = (e) => {
+      const files = Array.from(e.target.files || []);
+      for (const file of files) {
+        const preview = isImageFile(file) ? URL.createObjectURL(file) : null;
+        attachments.value.push({ file, preview });
+      }
+      // Reset so the same file can be re-selected
+      e.target.value = '';
+    };
+
+    const removeAttachment = (idx) => {
+      if (attachments.value[idx].preview) {
+        URL.revokeObjectURL(attachments.value[idx].preview);
+      }
+      attachments.value.splice(idx, 1);
+    };
+
     const sendMessage = () => {
       const text = inputText.value.trim();
-      if (!text) return;
+      const hasFiles = attachments.value.length > 0;
+      if (!text && !hasFiles) return;
+
+      const files = hasFiles ? attachments.value.map(a => a.file) : [];
 
       inputText.value = "";
+      // Clean up object URLs
+      attachments.value.forEach(a => {
+        if (a.preview) URL.revokeObjectURL(a.preview);
+      });
+      attachments.value = [];
+
       emit("new-message", {
         role: props.userName,
         content: text,
         contextName: props.contextName,
+        files: files.length ? files : undefined,
       });
       scrollToBottom();
     };
@@ -183,7 +252,7 @@ export default {
       () => scrollToBottom()
     );
 
-    return { inputText, cardStack, sendMessage, cardClass, toolIcon };
+    return { inputText, cardStack, fileInput, attachments, sendMessage, openFilePicker, addFiles, removeAttachment, cardClass, toolIcon, isImageFile };
   },
 };
 </script>
@@ -354,15 +423,84 @@ export default {
   background: rgba(255,255,255,1);
 }
 
+/* --- Attachments --- */
+.attachments-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 10px 0 10px;
+}
+
+.attachment-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px 2px 2px;
+  background: var(--surface-ground, #f3f4f6);
+  border: 1px solid var(--surface-border, #d3d3d3);
+  border-radius: 6px;
+  max-width: 200px;
+}
+
+.attachment-thumb {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.attachment-file-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.attachment-name {
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+}
+
+.attachment-remove {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: var(--text-color-secondary, #6b7280);
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.attachment-remove:hover {
+  color: #dc2626;
+}
+
+.file-input-hidden {
+  display: none;
+}
+
+/* --- Input box --- */
 .input-box {
   display: flex;
   gap: 8px;
   padding: 10px;
+  align-items: flex-end;
 }
 
 .input-box textarea {
   flex: 1;
   width: 100%;
   box-sizing: border-box;
+}
+
+.attach-btn {
+  flex-shrink: 0;
+  margin-bottom: 2px;
 }
 </style>

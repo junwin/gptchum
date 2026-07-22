@@ -99,6 +99,34 @@ class DataService {
     }
   }
 
+  // --- Image upload ---
+
+  async uploadImage(file, accountName) {
+    const key = this.apiKey || "";
+    const headers = {};
+    if (key) {
+      headers["X-API-Key"] = key;
+    }
+    // Don't set Content-Type — browser sets it with multipart boundary
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("accountName", accountName);
+
+    const response = await fetch(`${this.baseUrl}/upload/image`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Upload failed: ${response.status} ${err}`);
+    }
+
+    return response.json();
+  }
+
   // --- SSE Streaming ---
 
   async *askQuestionStreaming(
@@ -106,7 +134,8 @@ class DataService {
     agentName,
     accountName,
     conversationId,
-    contextName
+    contextName,
+    image_ids = null
   ) {
     const key = this.apiKey || "";
     const headers = {
@@ -116,17 +145,22 @@ class DataService {
       headers["X-API-Key"] = key;
     }
 
+    const body = {
+      question,
+      agentName,
+      accountName,
+      conversationId,
+      contextName,
+      stream: true,
+    };
+    if (image_ids && image_ids.length) {
+      body.image_ids = image_ids;
+    }
+
     const response = await fetch(`${this.baseUrl}/ask`, {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        question,
-        agentName,
-        accountName,
-        conversationId,
-        contextName,
-        stream: true,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {

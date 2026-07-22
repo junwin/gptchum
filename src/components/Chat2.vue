@@ -294,11 +294,11 @@ export default {
   watch: {
     selectedAgent(newAgent) {
       if (!newAgent) return;
-      this.store.agentName = newAgent.name;
+      this.store.setAgentName(newAgent.name);
     },
 
     accountName(newName) {
-      this.store.accountName = newName;
+      this.store.setAccountName(newName);
 
       this.selectedSession = null;
       this.responses = [{ id: "hello", role: "assistant", content: "Hello! How can I help you?" }];
@@ -313,7 +313,7 @@ export default {
     },
 
     contextName(newName) {
-      if (this.store) this.store.contextName = newName;
+      if (this.store) this.store.setContextName(newName);
     },
   },
 
@@ -384,6 +384,7 @@ export default {
     onSessionChange(e) {
       const s = e?.value;
       if (!s?.id) return;
+      if (this.store) this.store.setChatSessionId(s.id);
       this.loadChat(s.id);
     },
 
@@ -414,12 +415,16 @@ export default {
           return;
         }
 
-        const currentId = this.selectedSession?.id;
+        // Prefer: current in-memory session, then persisted session, then first
+        const currentId = this.selectedSession?.id || this.store?.getChatSessionId;
         const stillThere = currentId ? this.sessions.find(s => s.id === currentId) : null;
 
         this.selectedSession = stillThere || this.sessions[0];
 
-        await this.loadChat(this.selectedSession.id);
+        if (this.selectedSession?.id) {
+          if (this.store) this.store.setChatSessionId(this.selectedSession.id);
+          await this.loadChat(this.selectedSession.id);
+        }
       } catch (error) {
         console.error("Error refreshing sessions:", error);
       } finally {
@@ -595,9 +600,14 @@ export default {
       }
     },
 
+    _isImage(file) {
+      return file.type && file.type.startsWith("image/");
+    },
+
     async handleNewMessage(message) {
       const text = (message?.content || "").trim();
-      if (!text) return;
+      const files = message?.files || [];
+      if (!text && !files.length) return;
 
       await this.$nextTick();
       while (this.isLoadingChat) {
@@ -619,8 +629,93 @@ export default {
         await this.refreshSessions();
       }
 
-      // Add user message card
-      this.responses.push({ id: `u_${Date.now()}`, role: this.accountName, kind: "text", content: text });
+      // --- Process files: images get uploaded, text files get read ---
+      const imageIds = [];
+      let fileTexts = "";
+
+      for (const file of files) {
+        if (this._isImage(file)) {
+          // --- Image upload ---
+          const uploadCardId = `up_${Date.now()}_${imageIds.length}`;
+          this.responses.push({
+            id: uploadCardId,
+            role: this.accountName,
+            kind: "text",
+            content: `Uploading ${file.name}...`,
+          });
+
+          try {
+            const result = await this.dataService.uploadImage(file, this.accountName);
+            imageIds.push(result.id);
+
+            // Replace placeholder with image card
+            const idx = this.responses.findIndex(m => m.id === uploadCardId);
+            if (idx !== -1) {
+              this.responses[idx] = {
+                id: `img_${Date.now()}`,
+                role: this.accountName,
+                kind: "image",
+                image_url: URL.createObjectURL(file),
+                alt: file.name,
+              };
+            }
+          } catch (err) {
+            console.error("Image upload failed:", err);
+            const idx = this.responses.findIndex(m => m.id === uploadCardId);
+            if (idx !== -1) {
+              this.responses[idx] = {
+                id: `err_${Date.now()}`,
+                role: this.accountName,
+                kind: "text",
+                content: `Failed to upload ${file.name}: ${err.message}`,
+                error: true,
+              };
+            }
+          }
+        } else {
+          // --- Text file: read content client-side ---
+          try {
+            const content = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result);
+              reader.onerror = () => reject(reader.error);
+              reader.readAsText(file);
+            });
+
+            if (fileTexts) fileTexts += "\n\n";
+            fileTexts += `--- ${file.name} ---\n${content}`;
+
+            this.responses.push({
+              id: `file_${Date.now()}`,
+              role: this.accountName,
+              kind: "text",
+              content: `📄 Uploaded **${file.name}**`,
+            });
+          } catch (err) {
+            console.error("File read failed:", err);
+            this.responses.push({
+              id: `err_${Date.now()}`,
+              role: this.accountName,
+              kind: "text",
+              content: `Failed to read ${file.name}: ${err.message}`,
+              error: true,
+            });
+          }
+        }
+      }
+
+      // Build the combined question text (file contents + user text)
+      const questionText = [fileTexts, text].filter(Boolean).join("\n\n");
+
+      // Add user text message
+      if (questionText) {
+        this.responses.push({
+          id: `u_${Date.now()}`,
+          role: this.accountName,
+          kind: "text",
+          content: text || `📄 Sent ${files.filter(f => !this._isImage(f)).length} file(s)`,
+        });
+      }
 
       // Add placeholder assistant card
       const assistantCard = {
@@ -638,11 +733,12 @@ export default {
         this.isLoading = true;
 
         const stream = this.dataService.askQuestionStreaming(
-          text,
+          questionText,
           this.selectedAgent.name,
           this.accountName,
           sessionId,
           contextName,
+          imageIds.length ? imageIds : null,
         );
 
         for await (const event of stream) {

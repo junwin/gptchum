@@ -11,6 +11,7 @@ const CONTEXT_KEY = 'gptchum_context';
 const API_KEY_KEY = 'gptchum_api_key';
 const BASE_URL_KEY = 'gptchum_base_url';
 const ACCOUNT_KEY = 'gptchum_account';
+const CHAT_SESSION_KEY = 'gptchum_chat_session';
 
 function applyThemeToDocument(theme) {
     if (typeof document === 'undefined') return;
@@ -67,6 +68,7 @@ export const useSettingStore = defineStore('settings', {
             contextName: loadString(CONTEXT_KEY),
             apiKey: savedApiKey,
             theme: persistedTheme,
+            chatSessionId: loadString(CHAT_SESSION_KEY),
         };
     },
     getters: {
@@ -94,6 +96,9 @@ export const useSettingStore = defineStore('settings', {
         getServiceBaseUrl(state) {
             return state.serviceBaseUrl;
         },
+        getChatSessionId(state) {
+            return state.chatSessionId;
+        },
     },
     actions: {
         setData(newDataService) {
@@ -114,6 +119,10 @@ export const useSettingStore = defineStore('settings', {
         setApiKey(newApiKey) {
             this.apiKey = newApiKey || '';
             saveString(API_KEY_KEY, this.apiKey);
+        },
+        setChatSessionId(sessionId) {
+            this.chatSessionId = sessionId || '';
+            saveString(CHAT_SESSION_KEY, this.chatSessionId);
         },
         setServiceBaseUrl(newUrl) {
             const url = (newUrl || '').trim() || DEFAULT_BASE_URL;
