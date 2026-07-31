@@ -48,7 +48,7 @@
           <!-- Options -->
           <template #option="slotProps">
             <div class="session-option">
-              <div class="session-name">{{ slotProps.option.friendly_name }}</div>
+              <div class="session-name">{{ slotProps.option.friendly_name || slotProps.option.id || '(unnamed)' }}</div>
               <div class="session-meta">
                 <span v-if="slotProps.option.message_count != null">
                   {{ slotProps.option.message_count }} msgs
@@ -580,19 +580,26 @@ export default {
       }
     },
 
+    _makeChatName() {
+      // Fallback name when user cancels prompt: e.g. "Chat Jul 31"
+      const now = new Date();
+      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      return `Chat ${months[now.getMonth()]} ${now.getDate()}`;
+    },
+
     async createNewChat() {
       try {
         if (!this.canOperate) return;
 
-        const friendlyName = window.prompt("Chat name?", "tuesday");
+        const friendlyName = window.prompt("Chat name?", "tuesday") || this._makeChatName();
         const session = await this.dataService.createChat(
           this.selectedAgent.name,
           this.accountName,
-          friendlyName || null,
+          friendlyName,
           null
         );
 
-        this.selectedSession = { id: session.id, friendly_name: friendlyName || session.id };
+        this.selectedSession = { id: session.id, friendly_name: friendlyName };
 
         await this.refreshSessions();
       } catch (error) {
@@ -617,15 +624,15 @@ export default {
       let sessionId = this.selectedSession?.id;
 
       if (!sessionId) {
-        const friendlyName = window.prompt("Chat name?", "tuesday");
+        const friendlyName = window.prompt("Chat name?", "tuesday") || this._makeChatName();
         const session = await this.dataService.createChat(
           this.selectedAgent.name,
           this.accountName,
-          friendlyName || null,
+          friendlyName,
           null
         );
         sessionId = session.id;
-        this.selectedSession = { id: sessionId, friendly_name: friendlyName || sessionId };
+        this.selectedSession = { id: sessionId, friendly_name: friendlyName };
         await this.refreshSessions();
       }
 
