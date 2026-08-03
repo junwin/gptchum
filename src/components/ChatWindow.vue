@@ -7,14 +7,25 @@
         class="card"
         :class="cardClass(message)"
       >
-        <!-- Tool card -->
-        <template v-if="message.kind === 'tool'">
-          <div class="participant-name tool-label">
-            <span class="tool-icon">{{ toolIcon(message) }}</span>
-            {{ message.tool_name || 'Tool' }}
-          </div>
-          <div class="message tool-card">
-            <span class="tool-status">{{ message.content }}</span>
+        <!-- Tool chips card (inline between messages) -->
+        <template v-if="message.kind === 'tool_chips'">
+          <div class="tool-chips-row">
+            <div
+              v-for="chip in message.chips"
+              :key="chip.call_id"
+              class="ticker-chip"
+              :class="chipClass(chip.status)"
+              :title="chipTitle(chip)"
+            >
+              <span class="chip-icon">{{ statusIcon(chip.status) }}</span>
+              <span class="chip-name">{{ chip.tool_name || 'tool' }}</span>
+              <span class="chip-duration" v-if="chip.duration_ms != null">
+                {{ formatDuration(chip.duration_ms) }}
+              </span>
+              <span class="chip-spinner" v-if="chip.status === 'running'">
+                <span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>
+              </span>
+            </div>
           </div>
         </template>
 
@@ -232,17 +243,49 @@ export default {
     };
 
     const cardClass = (message) => {
-      if (message.kind === "tool") return "card-tool";
+      if (message.kind === "tool_chips") return "card-tools";
       if (message.kind === "image") return "card-image";
       if (message.error) return "card-error";
       if (message.isStreaming) return "card-streaming";
       return "";
     };
 
-    const toolIcon = (message) => {
-      if (message.ok === true) return "\u2705";  // checkmark
-      if (message.ok === false) return "\u274C"; // cross
-      return "\u23F3"; // hourglass (in progress)
+    // --- Tool chip helpers ---
+    const chipClass = (status) => {
+      switch (status) {
+        case 'success': return 'chip-ok';
+        case 'warning': return 'chip-warn';
+        case 'error':   return 'chip-err';
+        default:        return 'chip-running';
+      }
+    };
+
+    const statusIcon = (status) => {
+      switch (status) {
+        case 'success': return '\u2705';
+        case 'warning': return '\u26A0\uFE0F';
+        case 'error':   return '\u274C';
+        default:        return '\u{1F527}';
+      }
+    };
+
+    const formatDuration = (ms) => {
+      if (ms < 1000) return `${ms}ms`;
+      if (ms < 10000) return `${(ms / 1000).toFixed(1)}s`;
+      return `${Math.round(ms / 1000)}s`;
+    };
+
+    const chipTitle = (chip) => {
+      const status = chip.status || 'running';
+      const parts = [chip.tool_name || 'tool'];
+      if (chip.summary && chip.summary !== chip.tool_name) {
+        parts.push(`- ${chip.summary}`);
+      }
+      if (chip.duration_ms != null) {
+        parts.push(`(${formatDuration(chip.duration_ms)})`);
+      }
+      parts.push(`[${status}]`);
+      return parts.join(' ');
     };
 
     onMounted(scrollToBottom);
@@ -252,7 +295,7 @@ export default {
       () => scrollToBottom()
     );
 
-    return { inputText, cardStack, fileInput, attachments, sendMessage, openFilePicker, addFiles, removeAttachment, cardClass, toolIcon, isImageFile };
+    return { inputText, cardStack, fileInput, attachments, sendMessage, openFilePicker, addFiles, removeAttachment, cardClass, isImageFile, chipClass, statusIcon, formatDuration, chipTitle };
   },
 };
 </script>
@@ -292,31 +335,6 @@ export default {
   border-radius: 8px;
   background: var(--surface-card, #ffffff);
   color: var(--text-color, #111827);
-}
-
-/* Tool cards */
-.card-tool .tool-label {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  font-size: 0.85rem;
-  color: var(--text-color-secondary, #6b7280);
-}
-
-.tool-icon {
-  display: inline-block;
-  width: 1.2em;
-  margin-right: 4px;
-}
-
-.tool-card {
-  background: var(--surface-ground, #f3f4f6) !important;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  font-size: 0.85rem;
-  color: var(--text-color-secondary, #6b7280);
-  padding: 6px 12px !important;
-}
-
-.tool-status {
-  opacity: 0.85;
 }
 
 /* Image cards */
@@ -421,6 +439,87 @@ export default {
 
 .card .message :deep(.code-copy-button):hover {
   background: rgba(255,255,255,1);
+}
+
+/* --- Tool chips (inline) --- */
+.card-tools {
+  margin: 2px 0;
+}
+
+.tool-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 4px 8px;
+  background: var(--surface-ground, #f8f9fa);
+  border: 1px solid var(--surface-border, #d3d3d3);
+  border-radius: 6px;
+}
+
+.ticker-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.75rem;
+  border: 1px solid transparent;
+}
+
+.chip-running {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+.chip-ok {
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #166534;
+}
+.chip-warn {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+.chip-err {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.chip-icon {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.chip-name {
+  font-weight: 600;
+}
+
+.chip-duration {
+  opacity: 0.7;
+  font-size: 0.7rem;
+}
+
+/* Running spinner */
+.chip-spinner {
+  margin-left: 1px;
+}
+.chip-spinner .dot {
+  animation: ticker-blink 1.4s infinite both;
+  font-weight: bold;
+  color: #1d4ed8;
+}
+.chip-spinner .dot:nth-child(2) { animation-delay: 0.2s; }
+.chip-spinner .dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes ticker-blink {
+  0%, 80%, 100% { opacity: 0; }
+  40% { opacity: 1; }
 }
 
 /* --- Attachments --- */

@@ -443,6 +443,9 @@ export default {
       }
     },
 
+    // ------------------------------------------------------------------
+    // Message → card mapping (for chat display only — tool events are separate)
+    // ------------------------------------------------------------------
     _mapMessageToCard(m, idx) {
       const kind = m.kind || (m.role === "assistant" ? "assistant_message" : m.role === "user" ? "user_message" : m.role);
       const parsed = this._parseContent(m.content);
@@ -467,7 +470,6 @@ export default {
         case "generated_image": {
           const fmt = parsed?.format || "png";
           if (fmt === "svg") {
-            // SVG: build a data URI from svg_markup
             const svgMarkup = parsed?.svg_markup || "";
             const encoded = encodeURIComponent(svgMarkup);
             return {
@@ -481,7 +483,6 @@ export default {
               height: parsed?.height,
             };
           }
-          // PNG / default
           return {
             id: m.utc_timestamp || `img_${idx}`,
             role: this.selectedAgent?.name || "assistant",
@@ -492,39 +493,15 @@ export default {
           };
         }
 
-        case "assistant_tool_call": {
-          const toolName = parsed?.tool_name || "unknown";
-          const callId = parsed?.call_id || `tc_${idx}`;
-          return {
-            id: m.utc_timestamp || `tc_${idx}`,
-            role: "tool",
-            kind: "tool",
-            content: `Calling ${toolName}...`,
-            call_id: callId,
-            tool_name: toolName,
-            ok: null,
-          };
-        }
-
-        case "tool_result": {
-          const callId = parsed?.call_id || "";
-          const ok = parsed?.ok;
-          return {
-            id: m.utc_timestamp || `tr_${idx}`,
-            role: "tool",
-            kind: "tool_result_update",
-            call_id: callId,
-            ok: ok,
-          };
-        }
+        case "assistant_tool_call":
+        case "tool_result":
+          return null;
 
         case "summary":
         case "system_note":
-          // Skip non-display events
           return null;
 
         default:
-          // Fallback: treat as text
           return {
             id: m.utc_timestamp || `msg_${idx}`,
             role: m.role === "assistant" ? (this.selectedAgent?.name || "assistant") : this.accountName,
@@ -534,44 +511,123 @@ export default {
       }
     },
 
-    _postProcessCards(cards) {
-      // Merge tool_result updates into their preceding tool_call cards.
-      const result = [];
-      const toolCardsByCallId = {};
+    // ------------------------------------------------------------------
+    // Tool chips builder (for history loading — returns chip cards to insert)
+    // ------------------------------------------------------------------
+    _buildToolChipCards(messages) {
+      const chipCards = [];
+      let pendingChips = [];
+      let lastAssistantIdx = -1;
 
-      for (const card of cards) {
-        if (!card) continue;
+      for (let i = 0; i < messages.length; i++) {
+        const m = messages[i];
+        const kind = m.kind || (m.role === "assistant" ? "assistant_message" : "user_message");
 
-        if (card.kind === "tool") {
-          result.push(card);
-          toolCardsByCallId[card.call_id] = card;
-        } else if (card.kind === "tool_result_update") {
-          const toolCard = toolCardsByCallId[card.call_id];
-          if (toolCard) {
-            toolCard.ok = card.ok;
-            toolCard.content = card.ok ? "Done" : "Failed";
+        if (kind === "assistant_tool_call") {
+          const parsed = this._parseContent(m.content);
+          const ts = m.utc_timestamp ? new Date(m.utc_timestamp).getTime() : Date.now();
+          pendingChips.push({
+            call_id: (parsed && parsed.call_id) || `hist_${pendingChips.length}`,
+            tool_name: (parsed && parsed.tool_name) || "unknown",
+            status: "running",
+            startTime: ts,
+          });
+        } else if (kind === "tool_result") {
+          const parsed = this._parseContent(m.content);
+          if (!parsed || !parsed.call_id) continue;
+
+          const chip = pendingChips.find(c => c.call_id === parsed.call_id);
+          if (chip) {
+            if (parsed.status && ["success", "warning", "error"].includes(parsed.status)) {
+              chip.status = parsed.status;
+            } else {
+              chip.status = parsed.ok ? "success" : "error";
+            }
+            chip.summary = chip.status === "success" ? "Done"
+              : chip.status === "warning" ? "Non-zero exit"
+              : "Failed";
+            if (chip.startTime && m.utc_timestamp) {
+              chip.duration_ms = new Date(m.utc_timestamp).getTime() - chip.startTime;
+            }
           }
-          // Don't add the result card itself
-        } else {
-          result.push(card);
+        } else if (kind === "assistant_message") {
+          // Flush pending chips before this assistant message
+          if (pendingChips.length > 0) {
+            chipCards.push({
+              insertAfterMsgIdx: lastAssistantIdx >= 0 ? lastAssistantIdx : i - 1,
+              card: {
+                id: `tools_hist_${i}`,
+                kind: "tool_chips",
+                chips: [...pendingChips],
+              },
+            });
+            pendingChips = [];
+          }
+        }
+
+        if (kind === "assistant_message" || kind === "user_message") {
+          lastAssistantIdx = i;
         }
       }
 
-      return result;
+      // Flush any remaining chips at the end
+      if (pendingChips.length > 0) {
+        chipCards.push({
+          insertAfterMsgIdx: lastAssistantIdx,
+          card: {
+            id: `tools_hist_end`,
+            kind: "tool_chips",
+            chips: [...pendingChips],
+          },
+        });
+      }
+
+      return chipCards;
     },
 
+    // ------------------------------------------------------------------
+    // Chat loading
+    // ------------------------------------------------------------------
     async loadChat(sessionId) {
       try {
         if (!sessionId) return;
         this.isLoadingChat = true;
 
         const chat = await this.dataService.getChat(sessionId);
+        const messages = chat.messages || [];
 
-        const cards = (chat.messages || []).map((m, idx) => this._mapMessageToCard(m, idx));
-        const msgs = this._postProcessCards(cards);
+        // Map messages to display cards (tool events → null, filtered out)
+        const msgCards = messages
+          .map((m, idx) => this._mapMessageToCard(m, idx))
+          .filter(Boolean);
 
-        this.responses = msgs.length
-          ? msgs
+        // Build tool chip cards and insert them inline
+        const toolChipCards = this._buildToolChipCards(messages);
+
+        // Insert chip cards after their associated user message (working backwards so indices stay valid)
+        const sorted = [...toolChipCards].sort((a, b) => b.insertAfterMsgIdx - a.insertAfterMsgIdx);
+        for (const { insertAfterMsgIdx, card } of sorted) {
+          // insertAfterMsgIdx is an index in the original messages array.
+          // We need to find the corresponding card in msgCards.
+          // Count how many non-null cards we have up to insertAfterMsgIdx.
+          let cardCount = 0;
+          let targetIdx = -1;
+          for (let i = 0; i <= insertAfterMsgIdx && i < messages.length; i++) {
+            const mapped = this._mapMessageToCard(messages[i], i);
+            if (mapped !== null) {
+              cardCount++;
+              targetIdx = cardCount - 1;
+            }
+          }
+          if (targetIdx >= 0 && targetIdx < msgCards.length) {
+            msgCards.splice(targetIdx + 1, 0, card);
+          } else {
+            msgCards.push(card);
+          }
+        }
+
+        this.responses = msgCards.length
+          ? msgCards
           : [{ id: "hello", role: this.selectedAgent?.name || "assistant", content: "Hello! How can I help you?" }];
       } catch (error) {
         console.error("Error loading chat:", error);
@@ -609,6 +665,29 @@ export default {
 
     _isImage(file) {
       return file.type && file.type.startsWith("image/");
+    },
+
+    // ------------------------------------------------------------------
+    // Insert or get the tool chip card for the current streaming round
+    // ------------------------------------------------------------------
+    _getOrCreateChipCard() {
+      // Find the streaming assistant card
+      const assistantIdx = this.responses.findIndex(m => m.isStreaming);
+      if (assistantIdx < 0) return null;
+
+      // Look for an existing tool_chips card right before the assistant
+      if (assistantIdx > 0 && this.responses[assistantIdx - 1].kind === "tool_chips") {
+        return this.responses[assistantIdx - 1];
+      }
+
+      // Create a new tool_chips card and insert before the assistant
+      const card = {
+        id: `tools_${Date.now()}`,
+        kind: "tool_chips",
+        chips: [],
+      };
+      this.responses.splice(assistantIdx, 0, card);
+      return card;
     },
 
     async handleNewMessage(message) {
@@ -750,27 +829,38 @@ export default {
 
         for await (const event of stream) {
           switch (event.type) {
-            case "tool_call":
-              this.responses.push({
-                id: `tc_${event.call_id || Date.now()}`,
-                role: "tool",
-                kind: "tool",
-                content: `Calling ${event.tool_name}...`,
-                call_id: event.call_id,
-                tool_name: event.tool_name,
-                ok: null,
-              });
-              break;
-
-            case "tool_result":
-              const toolCard = this.responses.find(
-                m => m.kind === "tool" && m.call_id === event.call_id
-              );
-              if (toolCard) {
-                toolCard.ok = event.ok;
-                toolCard.content = event.ok ? "Done" : "Failed";
+            case "tool_call": {
+              const chipCard = this._getOrCreateChipCard();
+              if (chipCard) {
+                chipCard.chips.push({
+                  call_id: event.call_id || `tc_${Date.now()}`,
+                  tool_name: event.tool_name || "unknown",
+                  status: "running",
+                  startTime: Date.now(),
+                });
               }
               break;
+            }
+
+            case "tool_result": {
+              // Find the chip in the tool_chips card
+              const chipCard = this._getOrCreateChipCard();
+              if (chipCard) {
+                const chip = chipCard.chips.find(c => c.call_id === event.call_id);
+                if (chip) {
+                  if (event.status && ["success", "warning", "error"].includes(event.status)) {
+                    chip.status = event.status;
+                  } else {
+                    chip.status = event.ok ? "success" : "error";
+                  }
+                  chip.duration_ms = chip.startTime ? Date.now() - chip.startTime : undefined;
+                  chip.summary = chip.status === "success" ? "Done"
+                    : chip.status === "warning" ? "Non-zero exit"
+                    : "Failed";
+                }
+              }
+              break;
+            }
 
             case "text":
               if (assistantCard.message_id === event.message_id) {
@@ -785,7 +875,6 @@ export default {
             case "image": {
               const fmt = event.format || "png";
               if (fmt === "svg") {
-                // Build data URI from raw SVG markup
                 const svgMarkup = event.svg_markup || "";
                 const encoded = encodeURIComponent(svgMarkup);
                 this.responses.push({
@@ -799,7 +888,6 @@ export default {
                   height: event.height,
                 });
               } else {
-                // PNG
                 this.responses.push({
                   id: `img_${Date.now()}`,
                   role: this.selectedAgent.name,
@@ -840,8 +928,6 @@ export default {
               assistantCard.error = true;
               break;
           }
-
-          // scroll handled by ChatWindow watch
         }
 
         // Refresh sessions after streaming completes
