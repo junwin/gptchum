@@ -499,7 +499,13 @@ export default {
 
         case "summary":
         case "system_note":
-          return null;
+          return {
+            id: m.utc_timestamp || `sys_${idx}`,
+            role: "system",
+            kind: "system_note",
+            noteKind: kind,
+            content: typeof parsed === "string" ? parsed : JSON.stringify(parsed),
+          };
 
         default:
           return {

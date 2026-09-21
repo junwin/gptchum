@@ -29,6 +29,17 @@
           </div>
         </template>
 
+        <!-- System note card (digest, system_note, summary) -->
+        <template v-else-if="message.kind === 'system_note'">
+          <div class="system-note-card">
+            <div class="system-note-header">
+              <span class="system-note-icon">{{ message.noteKind === 'summary' ? '📋' : '📌' }}</span>
+              <span class="system-note-label">{{ message.noteKind === 'summary' ? 'Session Digest' : 'System Note' }}</span>
+            </div>
+            <SafeMarkdown class="system-note-body" :source="message.content" />
+          </div>
+        </template>
+
         <!-- Image card -->
         <template v-else-if="message.kind === 'image'">
           <div class="participant-name">
@@ -244,6 +255,7 @@ export default {
 
     const cardClass = (message) => {
       if (message.kind === "tool_chips") return "card-tools";
+      if (message.kind === "system_note") return "card-system-note";
       if (message.kind === "image") return "card-image";
       if (message.error) return "card-error";
       if (message.isStreaming) return "card-streaming";
@@ -335,6 +347,72 @@ export default {
   border-radius: 8px;
   background: var(--surface-card, #ffffff);
   color: var(--text-color, #111827);
+}
+
+/* --- System note card --- */
+.card-system-note {
+  margin: 8px 0 16px 0;
+}
+
+.system-note-card {
+  border: 1px solid var(--surface-border, #d3d3d3);
+  border-radius: 8px;
+  background: var(--surface-card, #ffffff);
+  overflow: hidden;
+}
+
+.system-note-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--highlight-bg, #dbeafe);
+  border-bottom: 1px solid var(--surface-border, #d3d3d3);
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--highlight-text-color, #1e40af);
+}
+
+.system-note-icon {
+  font-size: 1rem;
+}
+
+.system-note-body {
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  color: var(--text-color, #111827);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.system-note-body :deep(p) {
+  margin: 0 0 0.5rem 0;
+}
+
+.system-note-body :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.system-note-body :deep(h1),
+.system-note-body :deep(h2),
+.system-note-body :deep(h3) {
+  margin: 0.75rem 0 0.25rem 0;
+  font-size: 1rem;
+  color: var(--highlight-text-color, #1e40af);
+}
+
+.system-note-body :deep(ul),
+.system-note-body :deep(ol) {
+  margin: 0.25rem 0;
+  padding-left: 1.5rem;
+}
+
+.system-note-body :deep(pre) {
+  overflow: auto;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  background: var(--surface-code-bg, #0b1220);
 }
 
 /* Image cards */
