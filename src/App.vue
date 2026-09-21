@@ -2,14 +2,17 @@
   <div class="card">
     <h1>AI Assistant</h1>
     <div class="container">
-      <router-view />
+      <Chat2 />
     </div>
   </div>
 </template>
 
 <script>
+import Chat2 from './components/Chat2.vue'
+
 export default {
   name: "App",
+  components: { Chat2 },
 };
 </script>
 

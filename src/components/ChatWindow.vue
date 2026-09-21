@@ -5,17 +5,104 @@
         v-for="message in currentMessages"
         :key="message.id || message.utc_timestamp || message.content"
         class="card"
+        :class="cardClass(message)"
       >
-        <div class="participant-name">
-          {{ message.role === userName ? userName : assistantName }}
-        </div>
+        <!-- Tool chips card (inline between messages) -->
+        <template v-if="message.kind === 'tool_chips'">
+          <div class="tool-chips-row">
+            <div
+              v-for="chip in message.chips"
+              :key="chip.call_id"
+              class="ticker-chip"
+              :class="chipClass(chip.status)"
+              :title="chipTitle(chip)"
+            >
+              <span class="chip-icon">{{ statusIcon(chip.status) }}</span>
+              <span class="chip-name">{{ chip.tool_name || 'tool' }}</span>
+              <span class="chip-duration" v-if="chip.duration_ms != null">
+                {{ formatDuration(chip.duration_ms) }}
+              </span>
+              <span class="chip-spinner" v-if="chip.status === 'running'">
+                <span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>
+              </span>
+            </div>
+          </div>
+        </template>
 
-        <!-- Local SafeMarkdown overrides global one so we can add copy buttons to code blocks -->
-        <SafeMarkdown class="message" :source="message.content" />
+        <!-- System note card (digest, system_note, summary) -->
+        <template v-else-if="message.kind === 'system_note'">
+          <div class="system-note-card">
+            <div class="system-note-header">
+              <span class="system-note-icon">{{ message.noteKind === 'summary' ? '📋' : '📌' }}</span>
+              <span class="system-note-label">{{ message.noteKind === 'summary' ? 'Session Digest' : 'System Note' }}</span>
+            </div>
+            <SafeMarkdown class="system-note-body" :source="message.content" />
+          </div>
+        </template>
+
+        <!-- Image card -->
+        <template v-else-if="message.kind === 'image'">
+          <div class="participant-name">
+            {{ message.role === userName ? userName : assistantName }}
+          </div>
+          <div class="message image-card">
+            <img
+              v-if="message.image_url"
+              :src="message.image_url"
+              :alt="message.alt || 'Image'"
+              class="chat-image"
+            />
+            <span v-if="message.alt" class="image-alt">{{ message.alt }}</span>
+          </div>
+        </template>
+
+        <!-- Text card (default) -->
+        <template v-else>
+          <div class="participant-name">
+            {{ message.role === userName ? userName : assistantName }}
+            <span v-if="message.isStreaming" class="streaming-dots">
+              <span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>
+            </span>
+          </div>
+          <SafeMarkdown class="message" :source="message.content" />
+          <div v-if="message.error" class="error-badge">Error</div>
+        </template>
       </div>
     </ScrollPanel>
 
+    <!-- Attachment previews -->
+    <div class="attachments-row" v-if="attachments.length">
+      <div
+        v-for="(att, idx) in attachments"
+        :key="idx"
+        class="attachment-chip"
+        :title="att.file.name"
+      >
+        <img v-if="isImageFile(att.file)" :src="att.preview" class="attachment-thumb" />
+        <span v-else class="attachment-file-icon">📄</span>
+        <span class="attachment-name">{{ att.file.name }}</span>
+        <button class="attachment-remove" @click="removeAttachment(idx)" type="button">&times;</button>
+      </div>
+    </div>
+
     <div class="input-box">
+      <!-- Hidden file input -->
+      <input
+        ref="fileInput"
+        type="file"
+        accept="image/*,.md,.txt"
+        multiple
+        class="file-input-hidden"
+        @change="addFiles"
+      />
+
+      <Button
+        icon="pi pi-paperclip"
+        class="p-button-text attach-btn"
+        title="Attach file"
+        @click="openFilePicker"
+      />
+
       <Textarea
         v-model="inputText"
         placeholder="Enter your message"
@@ -35,15 +122,11 @@ export default {
   props: {
     assistantName: String,
     userName: String,
-    conversationId: String, // this will be the GUID session id now
+    conversationId: String,
     contextName: String,
     currentMessages: Array,
   },
   components: {
-    // Local SafeMarkdown component uses the app's configured markdown-it renderer
-    // (registered on app.config.globalProperties.$md in main.js). We render with v-html
-    // (markdown-it is configured with html: false) and then enhance code blocks by
-    // adding a copy button overlay per <pre>.
     SafeMarkdown: {
       props: ["source"],
       setup(props) {
@@ -57,10 +140,7 @@ export default {
 
           const pres = el.querySelectorAll("pre");
           pres.forEach((pre) => {
-            // avoid adding multiple buttons
             if (pre.querySelector('.code-copy-button')) return;
-
-            // make sure pre is positioned so the button can be absolutely placed
             pre.style.position = pre.style.position || "relative";
 
             const btn = document.createElement("button");
@@ -76,7 +156,6 @@ export default {
                 if (navigator.clipboard && navigator.clipboard.writeText) {
                   await navigator.clipboard.writeText(text);
                 } else {
-                  // fallback
                   const textarea = document.createElement("textarea");
                   textarea.value = text;
                   textarea.style.position = "fixed";
@@ -96,22 +175,16 @@ export default {
               }
             });
 
-            // place button into pre
             pre.appendChild(btn);
           });
         };
 
-        // expose render function
         return () => {
           const html = md ? md.render(props.source || "") : (props.source || "");
-          // we must set innerHTML; markdown-it is configured with html: false in main.js
-          // so raw HTML in the source will be escaped. We then run a small enhancement to
-          // add copy buttons. Because we manipulate DOM directly, we use nextTick to add buttons.
           return h('div', {
             class: 'safe-markdown',
             innerHTML: html,
             ref: containerRef,
-            // after vnode mounted we need to schedule copy button addition
             onVnodeMounted: () => { nextTick(addCopyButtons); },
             onVnodeUpdated: () => { nextTick(addCopyButtons); }
           });
@@ -122,6 +195,8 @@ export default {
   setup(props, { emit }) {
     const inputText = ref("");
     const cardStack = ref(null);
+    const fileInput = ref(null);
+    const attachments = ref([]);
 
     const scrollToBottom = () => {
       nextTick(() => {
@@ -130,28 +205,109 @@ export default {
       });
     };
 
+    const openFilePicker = () => {
+      fileInput.value?.click();
+    };
+
+    const isImageFile = (file) => {
+      return file.type && file.type.startsWith("image/");
+    };
+
+    const addFiles = (e) => {
+      const files = Array.from(e.target.files || []);
+      for (const file of files) {
+        const preview = isImageFile(file) ? URL.createObjectURL(file) : null;
+        attachments.value.push({ file, preview });
+      }
+      // Reset so the same file can be re-selected
+      e.target.value = '';
+    };
+
+    const removeAttachment = (idx) => {
+      if (attachments.value[idx].preview) {
+        URL.revokeObjectURL(attachments.value[idx].preview);
+      }
+      attachments.value.splice(idx, 1);
+    };
+
     const sendMessage = () => {
       const text = inputText.value.trim();
-      if (!text) return;
+      const hasFiles = attachments.value.length > 0;
+      if (!text && !hasFiles) return;
+
+      const files = hasFiles ? attachments.value.map(a => a.file) : [];
 
       inputText.value = "";
+      // Clean up object URLs
+      attachments.value.forEach(a => {
+        if (a.preview) URL.revokeObjectURL(a.preview);
+      });
+      attachments.value = [];
+
       emit("new-message", {
         role: props.userName,
         content: text,
         contextName: props.contextName,
+        files: files.length ? files : undefined,
       });
       scrollToBottom();
     };
 
+    const cardClass = (message) => {
+      if (message.kind === "tool_chips") return "card-tools";
+      if (message.kind === "system_note") return "card-system-note";
+      if (message.kind === "image") return "card-image";
+      if (message.error) return "card-error";
+      if (message.isStreaming) return "card-streaming";
+      return "";
+    };
+
+    // --- Tool chip helpers ---
+    const chipClass = (status) => {
+      switch (status) {
+        case 'success': return 'chip-ok';
+        case 'warning': return 'chip-warn';
+        case 'error':   return 'chip-err';
+        default:        return 'chip-running';
+      }
+    };
+
+    const statusIcon = (status) => {
+      switch (status) {
+        case 'success': return '\u2705';
+        case 'warning': return '\u26A0\uFE0F';
+        case 'error':   return '\u274C';
+        default:        return '\u{1F527}';
+      }
+    };
+
+    const formatDuration = (ms) => {
+      if (ms < 1000) return `${ms}ms`;
+      if (ms < 10000) return `${(ms / 1000).toFixed(1)}s`;
+      return `${Math.round(ms / 1000)}s`;
+    };
+
+    const chipTitle = (chip) => {
+      const status = chip.status || 'running';
+      const parts = [chip.tool_name || 'tool'];
+      if (chip.summary && chip.summary !== chip.tool_name) {
+        parts.push(`- ${chip.summary}`);
+      }
+      if (chip.duration_ms != null) {
+        parts.push(`(${formatDuration(chip.duration_ms)})`);
+      }
+      parts.push(`[${status}]`);
+      return parts.join(' ');
+    };
+
     onMounted(scrollToBottom);
 
-    // keep view pinned to bottom when parent loads new history
     watch(
       () => props.currentMessages?.length,
       () => scrollToBottom()
     );
 
-    return { inputText, cardStack, sendMessage };
+    return { inputText, cardStack, fileInput, attachments, sendMessage, openFilePicker, addFiles, removeAttachment, cardClass, isImageFile, chipClass, statusIcon, formatDuration, chipTitle };
   },
 };
 </script>
@@ -193,6 +349,130 @@ export default {
   color: var(--text-color, #111827);
 }
 
+/* --- System note card --- */
+.card-system-note {
+  margin: 8px 0 16px 0;
+}
+
+.system-note-card {
+  border: 1px solid var(--surface-border, #d3d3d3);
+  border-radius: 8px;
+  background: var(--surface-card, #ffffff);
+  overflow: hidden;
+}
+
+.system-note-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--highlight-bg, #dbeafe);
+  border-bottom: 1px solid var(--surface-border, #d3d3d3);
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--highlight-text-color, #1e40af);
+}
+
+.system-note-icon {
+  font-size: 1rem;
+}
+
+.system-note-body {
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  color: var(--text-color, #111827);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.system-note-body :deep(p) {
+  margin: 0 0 0.5rem 0;
+}
+
+.system-note-body :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.system-note-body :deep(h1),
+.system-note-body :deep(h2),
+.system-note-body :deep(h3) {
+  margin: 0.75rem 0 0.25rem 0;
+  font-size: 1rem;
+  color: var(--highlight-text-color, #1e40af);
+}
+
+.system-note-body :deep(ul),
+.system-note-body :deep(ol) {
+  margin: 0.25rem 0;
+  padding-left: 1.5rem;
+}
+
+.system-note-body :deep(pre) {
+  overflow: auto;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  background: var(--surface-code-bg, #0b1220);
+}
+
+/* Image cards */
+.card-image .image-card {
+  padding: 4px !important;
+  border: 1px solid var(--surface-border, #d3d3d3);
+}
+
+.chat-image {
+  max-width: 100%;
+  max-height: 400px;
+  border-radius: 4px;
+  display: block;
+}
+
+.image-alt {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-color-secondary, #6b7280);
+  margin-top: 4px;
+}
+
+/* Streaming indicator */
+.streaming-dots .dot {
+  animation: blink 1.4s infinite both;
+  font-weight: bold;
+  font-size: 1.2rem;
+  color: var(--primary-color, #3b82f6);
+}
+
+.streaming-dots .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.streaming-dots .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes blink {
+  0%, 80%, 100% { opacity: 0; }
+  40% { opacity: 1; }
+}
+
+/* Error badge */
+.error-badge {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #fee2e2;
+  color: #dc2626;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.card-error .message {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
 /* Make markdown look decent */
 .card .message :deep(p) {
   margin: 0 0 0.75rem 0;
@@ -206,7 +486,7 @@ export default {
   overflow: auto;
   padding: 0.75rem;
   border-radius: 6px;
-  position: relative; /* allow absolute button inside */
+  position: relative;
   background: var(--surface-code-bg, #0b1220);
 }
 
@@ -214,7 +494,6 @@ export default {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
-/* Highlight.js default styles are loaded globally (github.css). Provide small tweaks for dark backgrounds */
 .card .message :deep(pre.hljs) {
   background: var(--surface-code-bg, #0b1220);
   color: var(--text-color, #e6edf3);
@@ -222,7 +501,6 @@ export default {
   border-radius: 6px;
 }
 
-/* Copy button overlay */
 .card .message :deep(.code-copy-button) {
   position: absolute;
   top: 8px;
@@ -241,15 +519,165 @@ export default {
   background: rgba(255,255,255,1);
 }
 
+/* --- Tool chips (inline) --- */
+.card-tools {
+  margin: 2px 0;
+}
+
+.tool-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 4px 8px;
+  background: var(--surface-ground, #f8f9fa);
+  border: 1px solid var(--surface-border, #d3d3d3);
+  border-radius: 6px;
+}
+
+.ticker-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.75rem;
+  border: 1px solid transparent;
+}
+
+.chip-running {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+.chip-ok {
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #166534;
+}
+.chip-warn {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+.chip-err {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.chip-icon {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.chip-name {
+  font-weight: 600;
+}
+
+.chip-duration {
+  opacity: 0.7;
+  font-size: 0.7rem;
+}
+
+/* Running spinner */
+.chip-spinner {
+  margin-left: 1px;
+}
+.chip-spinner .dot {
+  animation: ticker-blink 1.4s infinite both;
+  font-weight: bold;
+  color: #1d4ed8;
+}
+.chip-spinner .dot:nth-child(2) { animation-delay: 0.2s; }
+.chip-spinner .dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes ticker-blink {
+  0%, 80%, 100% { opacity: 0; }
+  40% { opacity: 1; }
+}
+
+/* --- Attachments --- */
+.attachments-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 10px 0 10px;
+}
+
+.attachment-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px 2px 2px;
+  background: var(--surface-ground, #f3f4f6);
+  border: 1px solid var(--surface-border, #d3d3d3);
+  border-radius: 6px;
+  max-width: 200px;
+}
+
+.attachment-thumb {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.attachment-file-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.attachment-name {
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+}
+
+.attachment-remove {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: var(--text-color-secondary, #6b7280);
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.attachment-remove:hover {
+  color: #dc2626;
+}
+
+.file-input-hidden {
+  display: none;
+}
+
+/* --- Input box --- */
 .input-box {
   display: flex;
   gap: 8px;
   padding: 10px;
+  align-items: flex-end;
 }
 
 .input-box textarea {
   flex: 1;
   width: 100%;
   box-sizing: border-box;
+}
+
+.attach-btn {
+  flex-shrink: 0;
+  margin-bottom: 2px;
 }
 </style>

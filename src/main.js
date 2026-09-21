@@ -1,6 +1,5 @@
 import { createApp, h, ref, onMounted, watch, nextTick } from 'vue'
 import App from './App.vue'
-import { router } from './router'
 import './assets/main.css'
 import PrimeVue from 'primevue/config'
 import InputText from 'primevue/inputtext'
@@ -26,6 +25,10 @@ import TabMenu from 'primevue/tabmenu'
 import 'primevue/resources/primevue.min.css' // core css
 import 'primeicons/primeicons.css' // icons
 import 'primeflex/primeflex.css'
+
+// Import theme CSS files as URLs (Vite bundles them as hashed assets for production)
+import darkThemeUrl from 'primevue/resources/themes/lara-dark-blue/theme.css?url'
+import lightThemeUrl from 'primevue/resources/themes/lara-light-blue/theme.css?url'
 
 // Markdown rendering (safe: no raw HTML) and code highlighting
 import MarkdownIt from 'markdown-it'
@@ -55,7 +58,6 @@ app.component('VirtualScroller', VirtualScroller)
 
 const pinia = createPinia()
 app.use(pinia)
-app.use(router)
 
 // Create settings store instance (reads persisted theme/context on init)
 const settings = useSettingStore()
@@ -206,11 +208,15 @@ app.component('SafeMarkdown', {
 })
 
 // --- PrimeVue theme switching ---
-// The previous implementation used dynamic import(), but that *adds* CSS and does not remove
-// the old theme, so toggling often appears to do nothing.
-//
-// Instead, we manage a single <link> tag in <head> and swap its href.
+// Uses Vite's ?url imports so theme CSS files are bundled as hashed assets
+// that resolve correctly in both dev and production (no /node_modules/ dependency).
+
 const THEME_LINK_ID = 'primevue-theme-link'
+const themeUrls = {
+  dark: darkThemeUrl,
+  light: lightThemeUrl
+}
+
 function ensureThemeLink() {
   let link = document.getElementById(THEME_LINK_ID)
   if (!link) {
@@ -223,10 +229,7 @@ function ensureThemeLink() {
 }
 
 function setPrimeVueTheme(theme) {
-  const themeName = theme === 'dark' ? 'lara-dark-blue' : 'lara-light-blue'
-  // Vite will serve this from node_modules in dev.
-  // In build, it will be copied/rewritten appropriately.
-  const href = `/node_modules/primevue/resources/themes/${themeName}/theme.css`
+  const href = themeUrls[theme] || themeUrls.dark
   const link = ensureThemeLink()
   link.href = href
 }
