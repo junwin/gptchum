@@ -493,6 +493,19 @@ export default {
           };
         }
 
+        case "generated_video":
+          return {
+            id: m.utc_timestamp || `vid_${idx}`,
+            role: this.selectedAgent?.name || "assistant",
+            kind: "video",
+            remote_url: parsed?.video_url || parsed?.url || "",
+            mime_type: parsed?.mime_type || "video/mp4",
+            download_name: parsed?.download_name || "fashion-reel.mp4",
+            video_id: parsed?.video_id,
+            video_url: null,
+            loading: true,
+          };
+
         case "assistant_tool_call":
         case "tool_result":
           return null;
@@ -632,9 +645,11 @@ export default {
           }
         }
 
+        this._releaseVideoUrls();
         this.responses = msgCards.length
           ? msgCards
           : [{ id: "hello", role: this.selectedAgent?.name || "assistant", content: "Hello! How can I help you?" }];
+        await this._hydrateVideoCards(this.responses);
       } catch (error) {
         console.error("Error loading chat:", error);
       } finally {
@@ -694,6 +709,39 @@ export default {
       };
       this.responses.splice(assistantIdx, 0, card);
       return card;
+    },
+
+    _releaseVideoUrls(cards = this.responses) {
+      for (const card of cards || []) {
+        if (card?.kind === "video" && card.video_url?.startsWith("blob:")) {
+          URL.revokeObjectURL(card.video_url);
+        }
+      }
+    },
+
+    async _hydrateVideoCard(card) {
+      if (!card?.remote_url) {
+        card.loading = false;
+        card.error = "Video download URL is missing";
+        return;
+      }
+      try {
+        const blob = await this.dataService.downloadVideo(card.remote_url);
+        card.video_url = URL.createObjectURL(blob);
+        card.loading = false;
+      } catch (error) {
+        console.error("Video download failed:", error);
+        card.loading = false;
+        card.error = error.message || "Unable to download video";
+      }
+    },
+
+    async _hydrateVideoCards(cards) {
+      await Promise.all(
+        (cards || [])
+          .filter(card => card?.kind === "video" && card.remote_url)
+          .map(card => this._hydrateVideoCard(card))
+      );
     },
 
     async handleNewMessage(message) {
@@ -903,6 +951,23 @@ export default {
                   format: "png",
                 });
               }
+              break;
+            }
+
+            case "video": {
+              const card = {
+                id: `vid_${Date.now()}`,
+                role: this.selectedAgent.name,
+                kind: "video",
+                remote_url: event.video_url,
+                mime_type: event.mime_type || "video/mp4",
+                download_name: event.download_name || "fashion-reel.mp4",
+                video_id: event.video_id,
+                video_url: null,
+                loading: true,
+              };
+              this.responses.push(card);
+              await this._hydrateVideoCard(card);
               break;
             }
 
