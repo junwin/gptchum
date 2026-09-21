@@ -127,6 +127,22 @@ class DataService {
     return response.json();
   }
 
+  async downloadVideo(videoUrl) {
+    const key = this.apiKey || "";
+    const headers = {};
+    if (key) {
+      headers["X-API-Key"] = key;
+    }
+
+    const resolvedUrl = new URL(videoUrl, this.baseUrl).toString();
+    const response = await fetch(resolvedUrl, { headers });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Video download failed: ${response.status} ${err}`);
+    }
+    return response.blob();
+  }
+
   // --- SSE Streaming ---
 
   async *askQuestionStreaming(
