@@ -56,6 +56,31 @@
           </div>
         </template>
 
+        <!-- Video card -->
+        <template v-else-if="message.kind === 'video'">
+          <div class="participant-name">
+            {{ message.role === userName ? userName : assistantName }}
+          </div>
+          <div class="message video-card">
+            <video
+              v-if="message.video_url"
+              :src="message.video_url"
+              :type="message.mime_type || 'video/mp4'"
+              controls
+              playsinline
+              class="chat-video"
+            ></video>
+            <div v-if="message.loading" class="video-loading">Loading reel…</div>
+            <div v-if="message.error" class="error-badge">{{ message.error }}</div>
+            <a
+              v-if="message.video_url"
+              :href="message.video_url"
+              :download="message.download_name || 'fashion-reel.mp4'"
+              class="video-download"
+            >Download reel</a>
+          </div>
+        </template>
+
         <!-- Text card (default) -->
         <template v-else>
           <div class="participant-name">
@@ -257,6 +282,7 @@ export default {
       if (message.kind === "tool_chips") return "card-tools";
       if (message.kind === "system_note") return "card-system-note";
       if (message.kind === "image") return "card-image";
+      if (message.kind === "video") return "card-video";
       if (message.error) return "card-error";
       if (message.isStreaming) return "card-streaming";
       return "";
@@ -433,6 +459,37 @@ export default {
   font-size: 0.8rem;
   color: var(--text-color-secondary, #6b7280);
   margin-top: 4px;
+}
+
+/* Video cards */
+.card-video .video-card {
+  padding: 8px !important;
+  border: 1px solid var(--surface-border, #d3d3d3);
+}
+
+.chat-video {
+  width: min(100%, 420px);
+  max-height: 70vh;
+  border-radius: 6px;
+  display: block;
+  background: #000;
+}
+
+.video-download {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--primary-color, #2563eb);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.video-download:hover {
+  text-decoration: underline;
+}
+
+.video-loading {
+  padding: 12px;
+  color: var(--text-color-secondary, #6b7280);
 }
 
 /* Streaming indicator */
