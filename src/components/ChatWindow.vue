@@ -1,6 +1,6 @@
 <template>
   <div class="chat-window">
-    <ScrollPanel class="card-stack" ref="cardStack">
+    <div class="card-stack" ref="cardStack">
       <div
         v-for="message in currentMessages"
         :key="message.id || message.utc_timestamp || message.content"
@@ -93,7 +93,7 @@
           <div v-if="message.error" class="error-badge">Error</div>
         </template>
       </div>
-    </ScrollPanel>
+    </div>
 
     <!-- Attachment previews -->
     <div class="attachments-row" v-if="attachments.length">
@@ -123,6 +123,7 @@
 
       <Button
         icon="pi pi-paperclip"
+        aria-label="Attach file"
         class="p-button-text attach-btn"
         title="Attach file"
         @click="openFilePicker"
@@ -134,8 +135,9 @@
         autoResize
         @keydown.enter.exact.prevent="sendMessage"
         @keydown.enter.shift.exact.stop
+        class="message-input"
       />
-      <Button label="Send" @click="sendMessage" />
+      <Button label="Send" class="send-btn" @click="sendMessage" />
     </div>
   </div>
 </template>
@@ -225,7 +227,7 @@ export default {
 
     const scrollToBottom = () => {
       nextTick(() => {
-        const el = cardStack.value?.$el;
+        const el = cardStack.value;
         if (el) el.scrollTop = el.scrollHeight;
       });
     };
@@ -341,14 +343,16 @@ export default {
 <style scoped>
 .chat-window {
   width: 100%;
-  height: calc(100vh - 250px);
   display: flex;
   flex-direction: column;
 }
 
 .card-stack {
-  flex: 1;
   width: 100%;
+  min-width: 0;
+  max-height: max(12rem, calc(100dvh - 250px));
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 12px;
   box-sizing: border-box;
 }
@@ -368,6 +372,7 @@ export default {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  overflow-wrap: anywhere;
   padding: 10px 12px;
   border: 1px solid var(--surface-border, #d3d3d3);
   border-radius: 8px;
@@ -409,6 +414,7 @@ export default {
   color: var(--text-color, #111827);
   max-height: 400px;
   overflow-y: auto;
+  overflow-wrap: anywhere;
 }
 
 .system-note-body :deep(p) {
@@ -727,14 +733,38 @@ export default {
   align-items: flex-end;
 }
 
-.input-box textarea {
+.message-input {
   flex: 1;
-  width: 100%;
+  min-width: 0;
   box-sizing: border-box;
 }
 
-.attach-btn {
+.attach-btn, .send-btn {
   flex-shrink: 0;
-  margin-bottom: 2px;
+}
+
+@media (max-width: 600px) {
+  .input-box {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+  }
+
+  .message-input {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    width: 100%;
+  }
+
+  .attach-btn {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: start;
+  }
+
+  .send-btn {
+    grid-column: 2;
+    grid-row: 2;
+  }
 }
 </style>
