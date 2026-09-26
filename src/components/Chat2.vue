@@ -145,6 +145,7 @@
         :conversationId="selectedSession?.id || null"
         :currentMessages="responses"
         :contextName="(contextName || '').trim() || null"
+        :isSending="isSending"
         @new-message="handleNewMessage"
       />
     </div>
@@ -228,6 +229,7 @@ export default {
       apiKey: "",
 
       isLoading: false,
+      isSending: false,
 
       sessions: [],
       selectedSession: null,
@@ -331,10 +333,10 @@ export default {
     },
 
     savePrefs() {
-      // Save endpoint URL (recreates DataService)
+      // Both setters keep DataService in sync with the saved connection settings.
       if (this.store) {
-        this.store.setServiceBaseUrl(this.prefEndpoint);
         this.store.setApiKey(this.prefApiKey);
+        this.store.setServiceBaseUrl(this.prefEndpoint);
         this.store.setAccountName(this.prefAccount);
       }
 
@@ -745,6 +747,16 @@ export default {
     },
 
     async handleNewMessage(message) {
+      if (this.isSending) return;
+      this.isSending = true;
+      try {
+        await this._sendMessage(message);
+      } finally {
+        this.isSending = false;
+      }
+    },
+
+    async _sendMessage(message) {
       const text = (message?.content || "").trim();
       const files = message?.files || [];
       if (!text && !files.length) return;
