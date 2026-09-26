@@ -22,83 +22,6 @@ class DataService {
     }
   }
 
-  async askQuestion(
-    question,
-    agentName,
-    accountName,
-    conversationId,
-    selectType,
-    contextName,
-    apiKey
-  ) {
-    try {
-      const payload = {
-        question,
-        agentName,
-        accountName,
-        conversationId,
-        selectType,
-        contextName,
-      };
-      const headers = {};
-      if (apiKey) {
-        headers["X-API-Key"] = apiKey;
-      }
-      const response = await this.apiClient.post("/ask", payload, { headers });
-      return response.data;
-    } catch (error) {
-      console.error(error);
-      throw error;
-    }
-  }
-
-  async askQuestionMultiAgent(
-    question,
-    agentName,
-    accountName,
-    conversationId,
-    selectType,
-    secondaryAgent = null,
-    contextName,
-    apiKey
-  ) {
-    try {
-      // Previously this method hard-coded secondaryAgent when agentName was
-      // "glinda". That prevented callers from explicitly controlling
-      // secondaryAgent/contextName. Keep backwards compatibility by defaulting
-      // secondaryAgent to "dorothy" only when the caller does not supply one.
-      if (agentName === "glinda" && secondaryAgent == null) {
-        secondaryAgent = "dorothy";
-      }
-
-      const payload = {
-        question,
-        agentName,
-        accountName,
-        conversationId,
-        selectType,
-        contextName,
-      };
-
-      // Only include secondaryAgent when present, so the API receives the same
-      // shape as before for single-agent calls.
-      if (secondaryAgent != null) {
-        payload.secondaryAgent = secondaryAgent;
-      }
-
-      const headers = {};
-      if (apiKey) {
-        headers["X-API-Key"] = apiKey;
-      }
-
-      const response = await this.apiClient.post("/ask", payload, { headers });
-      return response.data;
-    } catch (error) {
-      console.error(error);
-      throw error;
-    }
-  }
-
   // --- Image upload ---
 
   async uploadImage(file, accountName) {
@@ -276,16 +199,6 @@ class DataService {
       });
 
       // Lucy returns a JSON array of strings.
-      return response.data;
-    } catch (error) {
-      console.error(error);
-      throw error;
-    }
-  }
-
-  async computeConversations(data) {
-    try {
-      const response = await this.apiClient.post("/prompt_builder", data);
       return response.data;
     } catch (error) {
       console.error(error);
