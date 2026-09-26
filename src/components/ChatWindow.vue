@@ -137,7 +137,7 @@
         @keydown.enter.shift.exact.stop
         class="message-input"
       />
-      <Button label="Send" class="send-btn" @click="sendMessage" />
+      <Button :label="isSending ? 'Sending…' : 'Send'" :disabled="isSending" class="send-btn" @click="sendMessage" />
     </div>
   </div>
 </template>
@@ -152,6 +152,7 @@ export default {
     conversationId: String,
     contextName: String,
     currentMessages: Array,
+    isSending: Boolean,
   },
   components: {
     SafeMarkdown: {
@@ -258,6 +259,7 @@ export default {
     };
 
     const sendMessage = () => {
+      if (props.isSending) return;
       const text = inputText.value.trim();
       const hasFiles = attachments.value.length > 0;
       if (!text && !hasFiles) return;

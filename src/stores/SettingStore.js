@@ -119,6 +119,7 @@ export const useSettingStore = defineStore('settings', {
         setApiKey(newApiKey) {
             this.apiKey = newApiKey || '';
             saveString(API_KEY_KEY, this.apiKey);
+            this.dataService = new DataService(this.serviceBaseUrl, this.apiKey);
         },
         setChatSessionId(sessionId) {
             this.chatSessionId = sessionId || '';
