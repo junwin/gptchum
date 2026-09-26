@@ -349,7 +349,9 @@ export default {
 
 .card-stack {
   width: 100%;
+  min-width: 0;
   max-height: max(12rem, calc(100dvh - 250px));
+  overflow-x: hidden;
   overflow-y: auto;
   padding: 12px;
   box-sizing: border-box;
@@ -370,6 +372,7 @@ export default {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  overflow-wrap: anywhere;
   padding: 10px 12px;
   border: 1px solid var(--surface-border, #d3d3d3);
   border-radius: 8px;
@@ -411,6 +414,7 @@ export default {
   color: var(--text-color, #111827);
   max-height: 400px;
   overflow-y: auto;
+  overflow-wrap: anywhere;
 }
 
 .system-note-body :deep(p) {
