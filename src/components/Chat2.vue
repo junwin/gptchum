@@ -3,7 +3,7 @@
   <div class="app-container">
     <div class="toolbar-container">
       <!-- Agent -->
-      <div class="p-mr-2">
+      <div class="toolbar-field agent-field">
         <Dropdown
           id="agentDropdown"
           v-model="selectedAgent"
@@ -14,7 +14,7 @@
       </div>
 
       <!-- Context -->
-      <div class="p-mr-2">
+      <div class="toolbar-field context-field">
         <Dropdown
           id="contextName"
           v-model="contextName"
@@ -26,7 +26,7 @@
       </div>
 
       <!-- Chat selector (OBJECT-based, stable via dataKey) -->
-      <div class="p-mr-2">
+      <div class="toolbar-field chat-field">
         <Dropdown
           id="chatDropdown"
           v-model="selectedSession"
@@ -63,26 +63,27 @@
       </div>
 
       <!-- Actions -->
-      <div class="p-mr-2">
+      <div class="toolbar-action">
         <Button label="New Chat" @click="createNewChat" :disabled="!canOperate" />
       </div>
 
-      <div class="p-mr-2">
+      <div class="toolbar-action">
         <Button label="Refresh" @click="refreshSessions" :disabled="!canOperate" />
       </div>
 
       <!-- Preferences button -->
-      <div class="p-mr-2">
+      <div class="toolbar-icon">
         <Button
           icon="pi pi-cog"
           class="p-button-rounded p-button-text"
+          aria-label="Preferences"
           @click="openPrefs"
           :title="'Lucy Endpoint: ' + (store?.serviceBaseUrl || 'not set')"
         />
       </div>
 
       <!-- Theme toggle (icon button) -->
-      <div class="p-ml-auto">
+      <div class="toolbar-icon theme-action">
         <Button
           class="p-button-text"
           :icon="isDarkMode ? 'pi pi-sun' : 'pi pi-moon'"
@@ -99,7 +100,7 @@
       header="Preferences"
       :modal="true"
       :closable="true"
-      :style="{ width: '450px' }"
+      :style="{ width: 'min(450px, calc(100vw - 2rem))' }"
     >
       <div class="prefs-form">
         <div class="field">
@@ -138,7 +139,7 @@
     </Dialog>
 
     <!-- Chat window -->
-    <div class="p-mr-2">
+    <div class="chat-content">
       <ChatWindow
         :assistantName="selectedAgent?.name || 'assistant'"
         :userName="accountName || 'user'"
@@ -162,18 +163,71 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  gap: 0.5rem;
   width: 100%;
   padding: 0.5rem;
-  background-color: #f5f5f5;
-  border: 1px solid #d3d3d3;
+  background-color: var(--surface-card, #f5f5f5);
+  border: 1px solid var(--surface-border, #d3d3d3);
 }
 
-.chat-dropdown {
-  min-width: 320px;
+.toolbar-field {
+  min-width: 0;
 }
 
-.context-dropdown {
-  min-width: 220px;
+.agent-field {
+  flex: 0 1 11rem;
+}
+
+.context-field {
+  flex: 0 1 16rem;
+}
+
+.chat-field {
+  flex: 1 1 18rem;
+}
+
+.toolbar-field :deep(.p-dropdown) {
+  width: 100%;
+  min-width: 0;
+  height: 2.75rem;
+}
+
+.toolbar-field :deep(.p-dropdown-label) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbar-action :deep(.p-button) {
+  min-width: 7rem;
+  height: 2.75rem;
+}
+
+.toolbar-icon :deep(.p-button) {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+.theme-action {
+  margin-left: auto;
+}
+
+.chat-content {
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  .toolbar-field {
+    flex: 1 1 100%;
+  }
+
+  .toolbar-action {
+    flex: 1 1 calc(50% - 0.25rem);
+  }
+
+  .toolbar-action :deep(.p-button) {
+    width: 100%;
+  }
 }
 
 .session-option {
