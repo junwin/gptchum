@@ -2,6 +2,12 @@
 <template>
   <div class="app-container">
     <div class="toolbar-container">
+      <div class="toolbar-icon">
+        <Button icon="pi pi-bars" class="p-button-text"
+          :aria-label="sidebarOpen ? 'Hide chats' : 'Show chats'"
+          :aria-expanded="sidebarOpen" aria-controls="chat-sidebar"
+          @click="sidebarOpen = !sidebarOpen" />
+      </div>
       <!-- Agent -->
       <div class="toolbar-field agent-field">
         <Dropdown
@@ -25,50 +31,9 @@
         />
       </div>
 
-      <!-- Chat selector (OBJECT-based, stable via dataKey) -->
-      <div class="toolbar-field chat-field">
-        <Dropdown
-          id="chatDropdown"
-          v-model="selectedSession"
-          :options="sessions"
-          optionLabel="friendly_name"
-          dataKey="id"
-          placeholder="Select chat"
-          class="chat-dropdown"
-          @change="onSessionChange"
-        >
-          <!-- Selected value -->
-          <template #value="slotProps">
-            <span v-if="slotProps.value">
-              {{ formatSessionLabel(slotProps.value) }}
-            </span>
-            <span v-else>Select chat</span>
-          </template>
-
-          <!-- Options -->
-          <template #option="slotProps">
-            <div class="session-option">
-              <div class="session-name">{{ slotProps.option.friendly_name || slotProps.option.id || '(unnamed)' }}</div>
-              <div class="session-meta">
-                <span v-if="slotProps.option.message_count != null">
-                  {{ slotProps.option.message_count }} msgs
-                </span>
-                <span v-if="slotProps.option.updated_at">
-                  · {{ formatUpdated(slotProps.option.updated_at) }}
-                </span>
-              </div>
-            </div>
-          </template>
-        </Dropdown>
-      </div>
-
       <!-- Actions -->
       <div class="toolbar-action">
         <Button label="New Chat" @click="createNewChat" :disabled="!canOperate" />
-      </div>
-
-      <div class="toolbar-action">
-        <Button label="Refresh" @click="refreshSessions" :disabled="!canOperate" />
       </div>
 
       <!-- Preferences button -->
@@ -138,17 +103,38 @@
       </template>
     </Dialog>
 
-    <!-- Chat window -->
-    <div class="chat-content">
-      <ChatWindow
-        :assistantName="selectedAgent?.name || 'assistant'"
-        :userName="accountName || 'user'"
-        :conversationId="selectedSession?.id || null"
-        :currentMessages="responses"
-        :contextName="(contextName || '').trim() || null"
-        :isSending="isSending"
-        @new-message="handleNewMessage"
-      />
+    <div class="chat-layout">
+      <aside v-show="sidebarOpen" id="chat-sidebar" class="chat-sidebar" aria-label="Chats">
+        <div class="sidebar-heading">
+          <h2>Chats</h2>
+          <Button icon="pi pi-refresh" class="p-button-text" aria-label="Refresh chats"
+            title="Refresh chats" :disabled="!canOperate || isLoading" @click="refreshSessions" />
+        </div>
+        <div v-if="!sessions.length" class="sidebar-empty">No chats yet</div>
+        <div v-else class="session-list">
+          <button v-for="session in sessions" :key="session.id" type="button"
+            class="session-item" :class="{ active: selectedSession?.id === session.id }"
+            :aria-current="selectedSession?.id === session.id ? 'true' : undefined"
+            @click="selectSession(session)">
+            <span class="session-name">{{ session.friendly_name || session.id || '(unnamed)' }}</span>
+            <span class="session-meta">
+              <span v-if="session.message_count != null">{{ session.message_count }} msgs</span>
+              <span v-if="session.updated_at"> · {{ formatUpdated(session.updated_at) }}</span>
+            </span>
+          </button>
+        </div>
+      </aside>
+      <div class="chat-content">
+        <ChatWindow
+          :assistantName="selectedAgent?.name || 'assistant'"
+          :userName="accountName || 'user'"
+          :conversationId="selectedSession?.id || null"
+          :currentMessages="responses"
+          :contextName="(contextName || '').trim() || null"
+          :isSending="isSending"
+          @new-message="handleNewMessage"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -157,6 +143,8 @@
 .app-container {
   width: 100%;
   height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .toolbar-container {
@@ -180,10 +168,6 @@
 
 .context-field {
   flex: 0 1 16rem;
-}
-
-.chat-field {
-  flex: 1 1 18rem;
 }
 
 .toolbar-field :deep(.p-dropdown) {
@@ -212,11 +196,85 @@
   margin-left: auto;
 }
 
+.chat-layout {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.chat-sidebar {
+  flex: 0 0 16rem;
+  min-width: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--surface-border, #d3d3d3);
+  background: var(--surface-card, #f5f5f5);
+}
+
+.sidebar-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+}
+
+.sidebar-heading h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.sidebar-empty {
+  padding: 0.75rem;
+  opacity: 0.7;
+}
+
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0 0.5rem 0.5rem;
+}
+
+.session-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  min-width: 0;
+  padding: 0.6rem;
+  border: 0;
+  border-radius: 0.375rem;
+  color: var(--text-color, inherit);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.session-item:hover,
+.session-item:focus-visible {
+  background: var(--surface-hover, #e8e8e8);
+}
+
+.session-item.active {
+  background: var(--highlight-bg, #dbeafe);
+  color: var(--highlight-text-color, inherit);
+}
+
 .chat-content {
+  flex: 1;
   min-width: 0;
 }
 
 @media (max-width: 600px) {
+  .chat-sidebar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 2;
+    width: min(18rem, calc(100vw - 3rem));
+    box-shadow: 0.25rem 0 0.75rem rgba(0, 0, 0, 0.15);
+  }
+
   .toolbar-field {
     flex: 1 1 100%;
   }
@@ -230,13 +288,10 @@
   }
 }
 
-.session-option {
-  display: flex;
-  flex-direction: column;
-}
-
 .session-name {
   font-weight: 600;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .session-meta {
@@ -287,6 +342,7 @@ export default {
 
       sessions: [],
       selectedSession: null,
+      sidebarOpen: true,
 
       selectType: "",
       dataService: null,
@@ -437,17 +493,12 @@ export default {
       }
     },
 
-    onSessionChange(e) {
-      const s = e?.value;
-      if (!s?.id) return;
-      if (this.store) this.store.setChatSessionId(s.id);
-      this.loadChat(s.id);
-    },
-
-    formatSessionLabel(session) {
-      const name = session?.friendly_name || session?.id || "(unnamed)";
-      const count = session?.message_count != null ? ` (${session.message_count})` : "";
-      return `${name}${count}`;
+    selectSession(session) {
+      if (!session?.id || session.id === this.selectedSession?.id) return;
+      this.selectedSession = session;
+      if (this.store) this.store.setChatSessionId(session.id);
+      this.loadChat(session.id);
+      if (window.matchMedia("(max-width: 600px)").matches) this.sidebarOpen = false;
     },
 
     formatUpdated(iso) {
