@@ -31,11 +31,6 @@
         />
       </div>
 
-      <!-- Actions -->
-      <div class="toolbar-action">
-        <Button label="New Chat" @click="createNewChat" :disabled="!canOperate" />
-      </div>
-
       <!-- Preferences button -->
       <div class="toolbar-icon">
         <Button
@@ -107,8 +102,12 @@
       <aside v-show="sidebarOpen" id="chat-sidebar" class="chat-sidebar" aria-label="Chats">
         <div class="sidebar-heading">
           <h2>Chats</h2>
-          <Button icon="pi pi-refresh" class="p-button-text" aria-label="Refresh chats"
-            title="Refresh chats" :disabled="!canOperate || isLoading" @click="refreshSessions" />
+          <div class="sidebar-actions">
+            <Button icon="pi pi-plus" class="p-button-text" aria-label="New chat"
+              title="New chat" :disabled="!canOperate" @click="createNewChat" />
+            <Button icon="pi pi-refresh" class="p-button-text" aria-label="Refresh chats"
+              title="Refresh chats" :disabled="!canOperate || isLoading" @click="refreshSessions" />
+          </div>
         </div>
         <div v-if="!sessions.length" class="sidebar-empty">No chats yet</div>
         <div v-else class="session-list">
@@ -182,11 +181,6 @@
   white-space: nowrap;
 }
 
-.toolbar-action :deep(.p-button) {
-  min-width: 7rem;
-  height: 2.75rem;
-}
-
 .toolbar-icon :deep(.p-button) {
   width: 2.75rem;
   height: 2.75rem;
@@ -222,6 +216,11 @@
 .sidebar-heading h2 {
   font-size: 1rem;
   margin: 0;
+}
+
+.sidebar-actions {
+  display: flex;
+  align-items: center;
 }
 
 .sidebar-empty {
@@ -277,14 +276,6 @@
 
   .toolbar-field {
     flex: 1 1 100%;
-  }
-
-  .toolbar-action {
-    flex: 1 1 calc(50% - 0.25rem);
-  }
-
-  .toolbar-action :deep(.p-button) {
-    width: 100%;
   }
 }
 
