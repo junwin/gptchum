@@ -30,28 +30,6 @@
           class="context-dropdown"
         />
       </div>
-
-      <!-- Preferences button -->
-      <div class="toolbar-icon">
-        <Button
-          icon="pi pi-cog"
-          class="p-button-rounded p-button-text"
-          aria-label="Preferences"
-          @click="openPrefs"
-          :title="'Lucy Endpoint: ' + (store?.serviceBaseUrl || 'not set')"
-        />
-      </div>
-
-      <!-- Theme toggle (icon button) -->
-      <div class="toolbar-icon theme-action">
-        <Button
-          class="p-button-text"
-          :icon="isDarkMode ? 'pi pi-sun' : 'pi pi-moon'"
-          :aria-label="isDarkMode ? 'Switch to light theme' : 'Switch to dark theme'"
-          :title="isDarkMode ? 'Light mode' : 'Dark mode'"
-          @click="toggleTheme"
-        />
-      </div>
     </div>
 
     <!-- Preferences Dialog -->
@@ -122,6 +100,14 @@
             </span>
           </button>
         </div>
+        <div class="sidebar-footer">
+          <Button icon="pi pi-cog" class="p-button-text" aria-label="Preferences"
+            :title="'Lucy Endpoint: ' + (store?.serviceBaseUrl || 'not set')"
+            @click="openPrefs" />
+          <Button class="p-button-text" :icon="isDarkMode ? 'pi pi-sun' : 'pi pi-moon'"
+            :aria-label="isDarkMode ? 'Switch to light theme' : 'Switch to dark theme'"
+            :title="isDarkMode ? 'Light mode' : 'Dark mode'" @click="toggleTheme" />
+        </div>
       </aside>
       <div class="chat-content">
         <ChatWindow
@@ -186,10 +172,6 @@
   height: 2.75rem;
 }
 
-.theme-action {
-  margin-left: auto;
-}
-
 .chat-layout {
   position: relative;
   display: flex;
@@ -199,9 +181,11 @@
 }
 
 .chat-sidebar {
+  display: flex;
+  flex-direction: column;
   flex: 0 0 16rem;
   min-width: 0;
-  overflow-y: auto;
+  min-height: 0;
   border-right: 1px solid var(--surface-border, #d3d3d3);
   background: var(--surface-card, #f5f5f5);
 }
@@ -224,6 +208,7 @@
 }
 
 .sidebar-empty {
+  flex: 1;
   padding: 0.75rem;
   opacity: 0.7;
 }
@@ -231,8 +216,18 @@
 .session-list {
   display: flex;
   flex-direction: column;
+  flex: 1;
   gap: 0.25rem;
+  min-height: 0;
+  overflow-y: auto;
   padding: 0 0.5rem 0.5rem;
+}
+
+.sidebar-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.5rem;
+  border-top: 1px solid var(--surface-border, #d3d3d3);
 }
 
 .session-item {
