@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import axios from 'axios';
+import { imageCard, addImageCard } from '../src/imageCards.js';
+import { reactive, watchEffect, nextTick } from 'vue';
 const serviceSource = fs.readFileSync(new URL('../src/DataService.js', import.meta.url), 'utf8')
   .replace(/^import .*;\s*$/gm, '').replace('export default DataService;', 'module.exports = DataService;');
 const serviceSandbox = { module: {}, axios, URL, fetch: (...args) => globalThis.fetch(...args) };
@@ -14,6 +16,7 @@ function component() {
   const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
     .replace(/^import .*;\s*$/gm, '').replace('export default', 'module.exports =');
   const sandbox = { module: {}, ChatWindow: {}, useSettingStore: () => ({}),
+    imageCard, addImageCard,
     URL: { createObjectURL: () => 'blob:stored-image', revokeObjectURL: () => {} }, console };
   vm.runInNewContext(script, sandbox);
   return { methods: sandbox.module.exports.methods, sandbox };
@@ -31,6 +34,33 @@ test('image downloads use the Lucy base URL and API key', async (t) => {
   const service = new DataService('https://lucy.example', 'test-key');
   assert.equal(await service.downloadImage('/download/image/123?accountName=john'), blob);
   await assert.rejects(() => service.downloadImage('https://other.example/image.png'), /Lucy server/);
+});
+
+test('live and reopened images share stable identity and duplicate delivery adds one card', () => {
+  const payload = { image_id: 'generated-id', image_url: 'data:image/png;base64,abc',
+    download_url: '/download/image/generated-id', alt: 'A hill' };
+  const cards = [];
+  const first = addImageCard(cards, imageCard(payload, { id: 'first', role: 'lucy' }));
+  const second = addImageCard(cards, imageCard(payload, { id: 'second', role: 'lucy' }));
+  assert.equal(first.created, true);
+  assert.equal(second.created, false);
+  assert.equal(cards.length, 1);
+  const reopened = imageCard({ ...payload, image_url: payload.download_url }, { id: 'history', role: 'lucy' });
+  assert.equal(reopened.id, cards[0].id);
+  assert.equal(cards[0].download_url, payload.download_url);
+});
+
+test('async hydration updates the reactive card visible to Vue', async () => {
+  const { methods } = component();
+  const cards = reactive([]);
+  const { card } = addImageCard(cards, imageCard({ image_id: 'id', image_url: '/download/image/id' },
+    { id: 'fallback', role: 'lucy' }));
+  let visibleUrl;
+  const stop = watchEffect(() => { visibleUrl = cards[0].image_url; });
+  await methods._hydrateImageCard.call({ dataService: { downloadImage: async () => new Blob(['png']) } }, card);
+  await nextTick();
+  assert.equal(visibleUrl, 'blob:stored-image');
+  stop();
 });
 
 test('stored images hydrate while inline images remain available', async () => {

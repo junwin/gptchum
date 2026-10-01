@@ -54,7 +54,8 @@
             />
             <div v-if="message.loading">Loading image…</div>
             <div v-if="message.error" class="error-badge">{{ message.error }}</div>
-            <a v-if="message.remote_url && message.image_url" :href="message.image_url" download="generated-image.png">Download image</a>
+            <a v-if="message.image_url" :href="message.image_url"
+              download="generated-image.png" @click.prevent="$emit('download-image', message)">Download image</a>
             <span v-if="message.alt" class="image-alt">{{ message.alt }}</span>
           </div>
         </template>
