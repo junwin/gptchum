@@ -118,6 +118,7 @@
           :contextName="(contextName || '').trim() || null"
           :isSending="isSending"
           @new-message="handleNewMessage"
+          @download-image="downloadImage"
         />
       </div>
     </div>
@@ -303,6 +304,7 @@
 
 <script>
 import ChatWindow from "./ChatWindow.vue";
+import { imageCard, addImageCard } from "../imageCards.js";
 import { useSettingStore } from "../stores/SettingStore.js";
 
 export default {
@@ -499,7 +501,7 @@ export default {
       }
     },
 
-    async refreshSessions() {
+    async refreshSessions({ loadMessages = true } = {}) {
       try {
         this.isLoading = true;
 
@@ -520,7 +522,7 @@ export default {
 
         if (this.selectedSession?.id) {
           if (this.store) this.store.setChatSessionId(this.selectedSession.id);
-          await this.loadChat(this.selectedSession.id);
+          if (loadMessages) await this.loadChat(this.selectedSession.id);
         }
       } catch (error) {
         console.error("Error refreshing sessions:", error);
@@ -580,14 +582,10 @@ export default {
               height: parsed?.height,
             };
           }
-          return {
-            id: m.utc_timestamp || `img_${idx}`,
+          return imageCard(parsed || {}, {
+            id: m.event_id || m.utc_timestamp || `img_${idx}`,
             role: this.selectedAgent?.name || "assistant",
-            kind: "image",
-            image_url: parsed?.image_url || m.content,
-            alt: parsed?.alt || "",
-            format: "png",
-          };
+          });
         }
 
         case "generated_video":
@@ -825,6 +823,7 @@ export default {
       card.remote_url = remoteUrl;
       card.image_url = null;
       card.loading = true;
+      card.error = null;
       try {
         const blob = await this.dataService.downloadImage(remoteUrl);
         card.image_url = URL.createObjectURL(blob);
@@ -832,6 +831,29 @@ export default {
         card.error = error.message || "Unable to download image";
       } finally {
         card.loading = false;
+      }
+    },
+
+    async downloadImage(card) {
+      card.error = null;
+      let objectUrl;
+      try {
+        const url = card.download_url || card.remote_url;
+        objectUrl = url
+          ? URL.createObjectURL(await this.dataService.downloadImage(url))
+          : card.image_url;
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = `generated-${card.image_id || "image"}.png`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      } catch (error) {
+        card.error = error.message || "Unable to download image";
+      } finally {
+        if (objectUrl?.startsWith("blob:") && objectUrl !== card.image_url) {
+          setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+        }
       }
     },
 
@@ -989,14 +1011,15 @@ export default {
       }
 
       // Add placeholder assistant card
-      const assistantCard = {
+      const assistantCardData = {
         id: `a_${Date.now()}`,
         role: this.selectedAgent.name,
         kind: "text",
         content: "",
         isStreaming: true,
       };
-      this.responses.push(assistantCard);
+      this.responses.push(assistantCardData);
+      const assistantCard = this.responses[this.responses.length - 1];
 
       const contextName = (this.contextName || "").trim() || null;
 
@@ -1048,13 +1071,10 @@ export default {
             }
 
             case "text":
-              if (assistantCard.message_id === event.message_id) {
-                // Update in-place (future word streaming)
-                assistantCard.content += event.content;
-              } else {
-                assistantCard.content = event.content;
-                assistantCard.message_id = event.message_id;
-              }
+              // Lucy currently emits complete text, not deltas. Replays replace
+              // the same card instead of appending duplicate text.
+              assistantCard.content = event.content;
+              assistantCard.message_id = event.message_id;
               break;
 
             case "image": {
@@ -1073,16 +1093,11 @@ export default {
                   height: event.height,
                 });
               } else {
-                const card = {
+                const added = addImageCard(this.responses, imageCard(event, {
                   id: `img_${Date.now()}`,
                   role: this.selectedAgent.name,
-                  kind: "image",
-                  image_url: event.image_url,
-                  alt: event.alt || "",
-                  format: "png",
-                };
-                this.responses.push(card);
-                await this._hydrateImageCard(card);
+                }));
+                if (added.created) await this._hydrateImageCard(added.card);
               }
               break;
             }
@@ -1100,7 +1115,7 @@ export default {
                 loading: true,
               };
               this.responses.push(card);
-              await this._hydrateVideoCard(card);
+              await this._hydrateVideoCard(this.responses[this.responses.length - 1]);
               break;
             }
 
@@ -1134,11 +1149,8 @@ export default {
           }
         }
 
-        // Refresh sessions after streaming completes
-        setTimeout(async () => {
-          await this.loadChat(sessionId);
-          await this.refreshSessions();
-        }, 150);
+        // Keep delivered inline images on screen; refresh only session metadata.
+        await this.refreshSessions({ loadMessages: false });
       } catch (err) {
         console.error("Streaming ask failed:", err);
         assistantCard.isStreaming = false;
