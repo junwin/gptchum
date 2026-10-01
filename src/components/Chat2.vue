@@ -356,6 +356,10 @@ export default {
     },
   },
 
+  beforeUnmount() {
+    this._releaseMediaUrls();
+  },
+
   async mounted() {
     this.store = useSettingStore();
     this.dataService = this.store.dataService;
@@ -738,11 +742,11 @@ export default {
           }
         }
 
-        this._releaseVideoUrls();
+        this._releaseMediaUrls();
         this.responses = msgCards.length
           ? msgCards
           : [{ id: "hello", role: this.selectedAgent?.name || "assistant", content: "Hello! How can I help you?" }];
-        await this._hydrateVideoCards(this.responses);
+        await Promise.all([this._hydrateVideoCards(this.responses), this._hydrateImageCards(this.responses)]);
       } catch (error) {
         console.error("Error loading chat:", error);
       } finally {
@@ -804,12 +808,36 @@ export default {
       return card;
     },
 
-    _releaseVideoUrls(cards = this.responses) {
+    _releaseMediaUrls(cards = this.responses) {
       for (const card of cards || []) {
         if (card?.kind === "video" && card.video_url?.startsWith("blob:")) {
           URL.revokeObjectURL(card.video_url);
         }
+        if (card?.kind === "image" && card.image_url?.startsWith("blob:")) {
+          URL.revokeObjectURL(card.image_url);
+        }
       }
+    },
+
+    async _hydrateImageCard(card) {
+      const remoteUrl = card.remote_url || card.image_url;
+      if (!remoteUrl || !remoteUrl.includes("/download/image/")) return;
+      card.remote_url = remoteUrl;
+      card.image_url = null;
+      card.loading = true;
+      try {
+        const blob = await this.dataService.downloadImage(remoteUrl);
+        card.image_url = URL.createObjectURL(blob);
+      } catch (error) {
+        card.error = error.message || "Unable to download image";
+      } finally {
+        card.loading = false;
+      }
+    },
+
+    async _hydrateImageCards(cards) {
+      await Promise.all((cards || []).filter(card => card?.kind === "image")
+        .map(card => this._hydrateImageCard(card)));
     },
 
     async _hydrateVideoCard(card) {
@@ -1045,14 +1073,16 @@ export default {
                   height: event.height,
                 });
               } else {
-                this.responses.push({
+                const card = {
                   id: `img_${Date.now()}`,
                   role: this.selectedAgent.name,
                   kind: "image",
                   image_url: event.image_url,
                   alt: event.alt || "",
                   format: "png",
-                });
+                };
+                this.responses.push(card);
+                await this._hydrateImageCard(card);
               }
               break;
             }

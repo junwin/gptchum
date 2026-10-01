@@ -66,6 +66,19 @@ class DataService {
     return response.blob();
   }
 
+  async downloadImage(imageUrl) {
+    const resolved = new URL(imageUrl, this.baseUrl);
+    if (resolved.origin !== new URL(this.baseUrl).origin) {
+      throw new Error("Image download URL must belong to the Lucy server");
+    }
+    const headers = this.apiKey ? { "X-API-Key": this.apiKey } : {};
+    const response = await fetch(resolved.toString(), { headers });
+    if (!response.ok) {
+      throw new Error(`Image download failed: ${response.status} ${await response.text()}`);
+    }
+    return response.blob();
+  }
+
   // --- SSE Streaming ---
 
   async *askQuestionStreaming(
