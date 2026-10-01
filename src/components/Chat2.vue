@@ -25,8 +25,12 @@
           id="contextName"
           v-model="contextName"
           :options="contextOptions"
+          optionLabel="label"
+          optionValue="value"
           editable
-          placeholder="default"
+          placeholder="None (automatic)"
+          aria-label="Context"
+          title="None (automatic) lets Lucy select the context. Choose or type a name to override it."
           class="context-dropdown"
         />
       </div>
@@ -320,7 +324,7 @@ export default {
 
       // Context
       contextName: "",
-      contextOptions: [],
+      contextOptions: [{ label: "None (automatic)", value: "" }],
 
       // API key (optional, per-request override)
       apiKey: "",
@@ -469,19 +473,20 @@ export default {
       try {
         const acct = (accountName ?? this.accountName ?? "").trim();
         if (!acct) {
-          this.contextOptions = [];
+          this.contextOptions = [{ label: "None (automatic)", value: "" }];
           return;
         }
 
         const names = await this.dataService.getContextNames(acct);
-        this.contextOptions = (names || []).filter(Boolean);
-
-        if (!(this.contextName || "").trim() && this.contextOptions.length) {
-          this.contextName = this.contextOptions[0];
-        }
+        this.contextOptions = [
+          // An empty value is sent as null, allowing Lucy's agent context selection.
+          // The literal "none" has a different meaning: disable project context.
+          { label: "None (automatic)", value: "" },
+          ...(names || []).filter(Boolean).map(name => ({ label: name, value: name })),
+        ];
       } catch (error) {
         console.error("Error fetching context names:", error);
-        this.contextOptions = [];
+        this.contextOptions = [{ label: "None (automatic)", value: "" }];
       }
     },
 
