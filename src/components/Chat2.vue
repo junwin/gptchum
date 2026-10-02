@@ -547,10 +547,17 @@ export default {
       }
     },
 
+    _messageAgentName(message) {
+      return message.actor || message.metadata?.agent ||
+        (message.role !== "assistant" ? message.role : null) ||
+        this.selectedAgent?.name || "assistant";
+    },
+
     // ------------------------------------------------------------------
     // Message → card mapping (for chat display only — tool events are separate)
     // ------------------------------------------------------------------
     _mapMessageToCard(m, idx) {
+      const agentName = this._messageAgentName(m);
       const kind = m.kind || (m.role === "assistant" ? "assistant_message" : m.role === "user" ? "user_message" : m.role);
       const parsed = this._parseContent(m.content);
 
@@ -566,7 +573,7 @@ export default {
         case "assistant_message":
           return {
             id: m.utc_timestamp || `a_${idx}`,
-            role: this.selectedAgent?.name || "assistant",
+            role: agentName,
             kind: "text",
             content: typeof parsed === "string" ? parsed : JSON.stringify(parsed),
           };
@@ -578,7 +585,7 @@ export default {
             const encoded = encodeURIComponent(svgMarkup);
             return {
               id: m.utc_timestamp || `img_${idx}`,
-              role: this.selectedAgent?.name || "assistant",
+              role: agentName,
               kind: "image",
               image_url: `data:image/svg+xml,${encoded}`,
               alt: parsed?.alt || "",
@@ -589,14 +596,14 @@ export default {
           }
           return imageCard(parsed || {}, {
             id: m.event_id || m.utc_timestamp || `img_${idx}`,
-            role: this.selectedAgent?.name || "assistant",
+            role: agentName,
           });
         }
 
         case "generated_video":
           return {
             id: m.utc_timestamp || `vid_${idx}`,
-            role: this.selectedAgent?.name || "assistant",
+            role: agentName,
             kind: "video",
             remote_url: parsed?.video_url || parsed?.url || "",
             mime_type: parsed?.mime_type || "video/mp4",
@@ -623,7 +630,7 @@ export default {
         default:
           return {
             id: m.utc_timestamp || `msg_${idx}`,
-            role: m.role === "assistant" ? (this.selectedAgent?.name || "assistant") : this.accountName,
+            role: m.role === "assistant" ? agentName : this.accountName,
             kind: "text",
             content: typeof parsed === "string" ? parsed : JSON.stringify(parsed),
           };
@@ -748,7 +755,7 @@ export default {
         this._releaseMediaUrls();
         this.responses = msgCards.length
           ? msgCards
-          : [{ id: "hello", role: this.selectedAgent?.name || "assistant", content: "Hello! How can I help you?" }];
+          : [{ id: "hello", role: agentName, content: "Hello! How can I help you?" }];
         await Promise.all([this._hydrateVideoCards(this.responses), this._hydrateImageCards(this.responses)]);
       } catch (error) {
         console.error("Error loading chat:", error);
