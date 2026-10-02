@@ -538,7 +538,7 @@ export default {
 
         if (this.sessions.length === 0) {
           this.selectedSession = null;
-          this.responses = [{ id: "hello", role: this.selectedAgent.name, content: "Hello! How can I help you?" }];
+          this.responses = [{ id: "hello", role: this.requestAgentName || "lucy", content: "Hello! How can I help you?" }];
           return;
         }
 
@@ -739,6 +739,7 @@ export default {
         this.isLoadingChat = true;
 
         const chat = await this.dataService.getChat(sessionId);
+        const agentName = chat.agent_name || this.requestAgentName || "lucy";
         const messages = chat.messages || [];
 
         // Map messages to display cards (tool events → null, filtered out)

@@ -80,3 +80,18 @@ test('auto send passes current account and labels the response with the routed s
   assert.equal(state.selectedAgent.name, 'star');
   assert.equal(state.contextName, 'skinny');
 });
+
+for (const storedAgent of ['lucy', '']) {
+  test(`empty chat reopens with ${storedAgent || 'missing'} stored agent`, async () => {
+    const c = component();
+    const state = {
+      ...c.data(), ...c.methods, requestAgentName: 'lucy',
+      dataService: { getChat: async () => ({ agent_name: storedAgent, messages: [] }) },
+      _releaseMediaUrls() {}, _hydrateVideoCards: async () => {}, _hydrateImageCards: async () => {},
+    };
+    await c.methods.loadChat.call(state, 'session');
+    assert.equal(state.responses[0].role, 'lucy');
+    assert.equal(state.responses[0].content, 'Hello! How can I help you?');
+    assert.equal(state.isLoadingChat, false);
+  });
+}
