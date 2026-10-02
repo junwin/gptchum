@@ -547,17 +547,13 @@ export default {
       }
     },
 
-    _messageAgentName(message) {
-      return message.actor || message.metadata?.agent ||
-        (message.role !== "assistant" ? message.role : null) ||
-        this.selectedAgent?.name || "assistant";
-    },
-
     // ------------------------------------------------------------------
     // Message → card mapping (for chat display only — tool events are separate)
     // ------------------------------------------------------------------
     _mapMessageToCard(m, idx) {
-      const agentName = this._messageAgentName(m);
+      const agentName = m.actor || m.metadata?.agent ||
+        (m.role !== "assistant" ? m.role : null) ||
+        this.selectedAgent?.name || "assistant";
       const kind = m.kind || (m.role === "assistant" ? "assistant_message" : m.role === "user" ? "user_message" : m.role);
       const parsed = this._parseContent(m.content);
 
