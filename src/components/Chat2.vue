@@ -13,6 +13,7 @@
         <Dropdown
           id="agentDropdown"
           v-model="selectedAgent"
+          :disabled="autoRouting"
           :options="agents"
           optionLabel="name"
           placeholder="Select agent"
@@ -24,6 +25,7 @@
         <Dropdown
           id="contextName"
           v-model="contextName"
+          :disabled="autoRouting"
           :options="contextOptions"
           optionLabel="label"
           optionValue="value"
@@ -82,6 +84,10 @@
 
     <div class="chat-layout">
       <aside v-show="sidebarOpen" id="chat-sidebar" class="chat-sidebar" aria-label="Chats">
+        <label class="sidebar-auto" for="autoRouting">
+          <input id="autoRouting" v-model="autoRouting" type="checkbox" :disabled="isSending" />
+          <span>auto</span>
+        </label>
         <div class="sidebar-heading">
           <h2>Chats</h2>
           <div class="sidebar-actions">
@@ -115,11 +121,11 @@
       </aside>
       <div class="chat-content">
         <ChatWindow
-          :assistantName="selectedAgent?.name || 'assistant'"
+          :assistantName="requestAgentName || 'assistant'"
           :userName="accountName || 'user'"
           :conversationId="selectedSession?.id || null"
           :currentMessages="responses"
-          :contextName="(contextName || '').trim() || null"
+          :contextName="autoRouting ? null : (contextName || '').trim() || null"
           :isSending="isSending"
           @new-message="handleNewMessage"
           @download-image="downloadImage"
@@ -193,6 +199,19 @@
   min-height: 0;
   border-right: 1px solid var(--surface-border, #d3d3d3);
   background: var(--surface-card, #f5f5f5);
+}
+
+.sidebar-auto {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  cursor: pointer;
+}
+
+.sidebar-auto input {
+  width: 1rem;
+  height: 1rem;
 }
 
 .sidebar-heading {
@@ -320,6 +339,7 @@ export default {
       responses: [{ id: "hello", role: "assistant", content: "Hello! How can I help you?" }],
       agents: [],
       selectedAgent: null,
+      autoRouting: false,
       accountName: "",
 
       // Context
@@ -354,8 +374,11 @@ export default {
   },
 
   computed: {
+    requestAgentName() {
+      return this.autoRouting ? "lucy" : this.selectedAgent?.name;
+    },
     canOperate() {
-      return !!(this.dataService && this.accountName && this.selectedAgent?.name);
+      return !!(this.dataService && this.accountName && this.requestAgentName);
     },
     isDarkMode() {
       return this.store?.theme === "dark";
@@ -515,7 +538,7 @@ export default {
 
         if (this.sessions.length === 0) {
           this.selectedSession = null;
-          this.responses = [{ id: "hello", role: this.selectedAgent.name, content: "Hello! How can I help you?" }];
+          this.responses = [{ id: "hello", role: this.requestAgentName || "lucy", content: "Hello! How can I help you?" }];
           return;
         }
 
@@ -716,6 +739,7 @@ export default {
         this.isLoadingChat = true;
 
         const chat = await this.dataService.getChat(sessionId);
+        const agentName = chat.agent_name || this.requestAgentName || "lucy";
         const messages = chat.messages || [];
 
         // Map messages to display cards (tool events → null, filtered out)
@@ -773,7 +797,7 @@ export default {
 
         const friendlyName = window.prompt("Chat name?", "tuesday") || this._makeChatName();
         const session = await this.dataService.createChat(
-          this.selectedAgent.name,
+          this.requestAgentName,
           this.accountName,
           friendlyName,
           null
@@ -920,7 +944,7 @@ export default {
       if (!sessionId) {
         const friendlyName = window.prompt("Chat name?", "tuesday") || this._makeChatName();
         const session = await this.dataService.createChat(
-          this.selectedAgent.name,
+          this.requestAgentName,
           this.accountName,
           friendlyName,
           null
@@ -1018,10 +1042,12 @@ export default {
         });
       }
 
+      // Capture the request agent; routing can identify the actual specialist.
+      let responseAgentName = this.requestAgentName;
       // Add placeholder assistant card
       const assistantCardData = {
         id: `a_${Date.now()}`,
-        role: this.selectedAgent.name,
+        role: responseAgentName,
         kind: "text",
         content: "",
         isStreaming: true,
@@ -1029,18 +1055,19 @@ export default {
       this.responses.push(assistantCardData);
       const assistantCard = this.responses[this.responses.length - 1];
 
-      const contextName = (this.contextName || "").trim() || null;
+      const contextName = this.autoRouting ? null : (this.contextName || "").trim() || null;
 
       try {
         this.isLoading = true;
 
         const stream = this.dataService.askQuestionStreaming(
           questionText,
-          this.selectedAgent.name,
+          this.requestAgentName,
           this.accountName,
           sessionId,
           contextName,
           imageIds.length ? imageIds : null,
+          this.autoRouting,
         );
 
         for await (const event of stream) {
@@ -1092,7 +1119,7 @@ export default {
                 const encoded = encodeURIComponent(svgMarkup);
                 this.responses.push({
                   id: `img_${Date.now()}`,
-                  role: this.selectedAgent.name,
+                  role: responseAgentName,
                   kind: "image",
                   image_url: `data:image/svg+xml,${encoded}`,
                   alt: event.alt || "",
@@ -1103,7 +1130,7 @@ export default {
               } else {
                 const added = addImageCard(this.responses, imageCard(event, {
                   id: `img_${Date.now()}`,
-                  role: this.selectedAgent.name,
+                  role: responseAgentName,
                 }));
                 if (added.created) await this._hydrateImageCard(added.card);
               }
@@ -1113,7 +1140,7 @@ export default {
             case "video": {
               const card = {
                 id: `vid_${Date.now()}`,
-                role: this.selectedAgent.name,
+                role: responseAgentName,
                 kind: "video",
                 remote_url: event.video_url,
                 mime_type: event.mime_type || "video/mp4",
@@ -1128,7 +1155,10 @@ export default {
             }
 
             case "action":
-              if (event.action === "reset_session") {
+              if (event.action === "request_routing") {
+                responseAgentName = event.action_payload?.selected_agent || responseAgentName;
+                assistantCard.role = responseAgentName;
+              } else if (event.action === "reset_session") {
                 this.selectedSession = null;
                 this.responses = [];
                 await this.refreshSessions();

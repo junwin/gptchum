@@ -87,7 +87,8 @@ class DataService {
     accountName,
     conversationId,
     contextName,
-    image_ids = null
+    image_ids = null,
+    autoRouting = false
   ) {
     const key = this.apiKey || "";
     const headers = {
@@ -99,12 +100,16 @@ class DataService {
 
     const body = {
       question,
-      agentName,
+      agentName: autoRouting ? "lucy" : agentName,
       accountName,
       conversationId,
-      contextName,
       stream: true,
     };
+    if (autoRouting) {
+      body.routing = "auto";
+    } else {
+      body.contextName = contextName;
+    }
     if (image_ids && image_ids.length) {
       body.image_ids = image_ids;
     }
