@@ -43,7 +43,7 @@
         <!-- Image card -->
         <template v-else-if="message.kind === 'image'">
           <div class="participant-name">
-            {{ message.role === userName ? userName : assistantName }}
+            {{ participantName(message) }}
           </div>
           <div class="message image-card">
             <img
@@ -63,7 +63,7 @@
         <!-- Video card -->
         <template v-else-if="message.kind === 'video'">
           <div class="participant-name">
-            {{ message.role === userName ? userName : assistantName }}
+            {{ participantName(message) }}
           </div>
           <div class="message video-card">
             <video
@@ -88,7 +88,7 @@
         <!-- Text card (default) -->
         <template v-else>
           <div class="participant-name">
-            {{ message.role === userName ? userName : assistantName }}
+            {{ participantName(message) }}
             <span v-if="message.isStreaming" class="streaming-dots">
               <span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>
             </span>
@@ -230,6 +230,10 @@ export default {
     const fileInput = ref(null);
     const attachments = ref([]);
 
+    const participantName = (message) => message.role === props.userName
+      ? props.userName
+      : (message.role && message.role !== "assistant" ? message.role : props.assistantName || "assistant");
+
     const scrollToBottom = () => {
       nextTick(() => {
         const el = cardStack.value;
@@ -341,7 +345,7 @@ export default {
       () => scrollToBottom()
     );
 
-    return { inputText, cardStack, fileInput, attachments, sendMessage, openFilePicker, addFiles, removeAttachment, cardClass, isImageFile, chipClass, statusIcon, formatDuration, chipTitle };
+    return { inputText, cardStack, fileInput, attachments, sendMessage, openFilePicker, addFiles, removeAttachment, cardClass, isImageFile, chipClass, statusIcon, formatDuration, chipTitle, participantName };
   },
 };
 </script>
