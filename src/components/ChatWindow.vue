@@ -89,6 +89,11 @@
         <template v-else>
           <div class="participant-name">
             {{ participantName(message) }}
+            <button v-if="message.eventRole === 'user'" type="button" class="message-menu-button"
+              aria-label="Message actions" aria-haspopup="menu" :aria-expanded="menuMessage === message"
+              :disabled="deletionDisabled || !message.exchangeCorrelationId"
+              :title="message.exchangeCorrelationId ? 'Message actions' : 'Exchange identifier unavailable'"
+              @click="openMessageMenu($event, message)">⋯</button>
             <span v-if="message.isStreaming" class="streaming-dots">
               <span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>
             </span>
@@ -98,6 +103,8 @@
         </template>
       </div>
     </div>
+
+    <Menu ref="messageMenu" :model="messageMenuItems" :popup="true" @hide="menuMessage = null" />
 
     <!-- Attachment previews -->
     <div class="attachments-row" v-if="attachments.length">
@@ -147,7 +154,8 @@
 </template>
 
 <script>
-import { ref, onMounted, nextTick, watch, getCurrentInstance, h } from "vue";
+import Menu from "primevue/menu";
+import { computed, ref, onMounted, nextTick, watch, getCurrentInstance, h } from "vue";
 
 export default {
   props: {
@@ -157,8 +165,10 @@ export default {
     contextName: String,
     currentMessages: Array,
     isSending: Boolean,
+    deletionDisabled: Boolean,
   },
   components: {
+    Menu,
     SafeMarkdown: {
       props: ["source"],
       setup(props) {
@@ -225,6 +235,23 @@ export default {
     },
   },
   setup(props, { emit }) {
+    const messageMenu = ref(null);
+    const menuMessage = ref(null);
+    const messageMenuItems = computed(() => [{ label: "Delete exchange", icon: "pi pi-trash",
+      disabled: props.deletionDisabled || !menuMessage.value?.exchangeCorrelationId,
+      command: () => {
+        if (!props.deletionDisabled && menuMessage.value?.exchangeCorrelationId) {
+          emit("delete-exchange", menuMessage.value);
+        }
+      },
+    }]);
+    const openMessageMenu = (event, message) => {
+      if (props.deletionDisabled || !message.exchangeCorrelationId) return;
+      menuMessage.value = message;
+      messageMenu.value.toggle(event);
+    };
+    watch(() => props.deletionDisabled, disabled => { if (disabled) messageMenu.value?.hide(); });
+    watch(() => props.currentMessages, () => messageMenu.value?.hide());
     const inputText = ref("");
     const cardStack = ref(null);
     const fileInput = ref(null);
@@ -345,7 +372,7 @@ export default {
       () => scrollToBottom()
     );
 
-    return { inputText, cardStack, fileInput, attachments, sendMessage, openFilePicker, addFiles, removeAttachment, cardClass, isImageFile, chipClass, statusIcon, formatDuration, chipTitle, participantName };
+    return { messageMenu, menuMessage, messageMenuItems, openMessageMenu, inputText, cardStack, fileInput, attachments, sendMessage, openFilePicker, addFiles, removeAttachment, cardClass, isImageFile, chipClass, statusIcon, formatDuration, chipTitle, participantName };
   },
 };
 </script>
@@ -376,6 +403,26 @@ export default {
   font-weight: 600;
   margin-bottom: 6px;
 }
+
+/* A 44px touch target fits the existing name line without a new row. */
+.message-menu-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: -12px 0 -12px 4px;
+  padding: 0;
+  vertical-align: middle;
+  font-size: 1.2rem;
+  background: transparent;
+  color: inherit;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.message-menu-button:focus-visible { outline: 2px solid var(--primary-color, #2563eb); }
+.message-menu-button:disabled { opacity: 0.4; cursor: default; }
 
 /* Markdown output container */
 .card .message {
