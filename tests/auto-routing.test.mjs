@@ -85,8 +85,12 @@ for (const storedAgent of ['lucy', '']) {
   test(`empty chat reopens with ${storedAgent || 'missing'} stored agent`, async () => {
     const c = component();
     const state = {
-      ...c.data(), ...c.methods, requestAgentName: 'lucy',
-      dataService: { getChat: async () => ({ agent_name: storedAgent, messages: [] }) },
+      ...c.data(), ...c.methods, requestAgentName: 'lucy', accountName: 'arla',
+      dataService: { getChat: async (sessionId, accountName) => {
+        assert.equal(sessionId, 'session');
+        assert.equal(accountName, 'arla');
+        return { agent_name: storedAgent, messages: [] };
+      } },
       _releaseMediaUrls() {}, _hydrateVideoCards: async () => {}, _hydrateImageCards: async () => {},
     };
     await c.methods.loadChat.call(state, 'session');
@@ -95,3 +99,28 @@ for (const storedAgent of ['lucy', '']) {
     assert.equal(state.isLoadingChat, false);
   });
 }
+
+
+test('chat history request supplies the owning account and API key', async () => {
+  const api = service();
+  const chat = { id: 'session', messages: [{ role: 'user', content: 'hello' }] };
+  api.apiClient.defaults.adapter = async (config) => {
+    assert.equal(config.url, '/chats/session');
+    assert.equal(config.params.accountName, 'John & Arla');
+    const url = new URL(api.apiClient.getUri(config));
+    assert.equal(url.searchParams.get('accountName'), 'John & Arla');
+    assert.equal(config.headers['X-API-Key'], 'key');
+    return { data: chat, status: 200, statusText: 'OK', headers: {}, config };
+  };
+  assert.equal(await api.getChat('session', 'John & Arla'), chat);
+});
+
+test('chat history requires an account before sending the request', async () => {
+  const api = service();
+  let calls = 0;
+  api.apiClient.defaults.adapter = async () => { calls++; };
+  for (const account of [undefined, null, '', '   ']) {
+    await assert.rejects(() => api.getChat('session', account), /accountName is required/);
+  }
+  assert.equal(calls, 0);
+});

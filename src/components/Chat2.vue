@@ -738,7 +738,7 @@ export default {
         if (!sessionId) return;
         this.isLoadingChat = true;
 
-        const chat = await this.dataService.getChat(sessionId);
+        const chat = await this.dataService.getChat(sessionId, this.accountName);
         const agentName = chat.agent_name || this.requestAgentName || "lucy";
         const messages = chat.messages || [];
 

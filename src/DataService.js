@@ -184,9 +184,14 @@ class DataService {
     }
   }
 
-  async getChat(sessionId) {
+  async getChat(sessionId, accountName) {
     try {
-      const response = await this.apiClient.get(`/chats/${sessionId}`);
+      if (accountName == null || String(accountName).trim() === "") {
+        throw new Error("accountName is required");
+      }
+      const response = await this.apiClient.get(`/chats/${sessionId}`, {
+        params: { accountName },
+      });
       return response.data; // includes messages[]
     } catch (error) {
       console.error(error);
