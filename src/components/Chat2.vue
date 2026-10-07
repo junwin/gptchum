@@ -82,6 +82,19 @@
       </template>
     </Dialog>
 
+    <Dialog v-model:visible="showDeleteExchange" header="Delete exchange?" :modal="true"
+      :closable="!isDeletingExchange" :closeOnEscape="!isDeletingExchange"
+      :style="{ width: 'min(420px, calc(100vw - 2rem))' }">
+      <p>Remove this message and its replies from the conversation?</p>
+      <p v-if="deleteExchangeError" role="alert">{{ deleteExchangeError }}</p>
+      <template #footer>
+        <Button label="Cancel" class="p-button-text" :disabled="isDeletingExchange" @click="showDeleteExchange = false" />
+        <Button :label="isDeletingExchange ? 'Deleting…' : 'Delete'" class="p-button-danger"
+          :disabled="isSending || isLoadingChat || isDeletingExchange" @click="confirmDeleteExchange" />
+      </template>
+    </Dialog>
+    <p v-if="historyRefreshError" role="alert" class="history-error">{{ historyRefreshError }}</p>
+
     <div class="chat-layout">
       <aside v-show="sidebarOpen" id="chat-sidebar" class="chat-sidebar" aria-label="Chats">
         <label class="sidebar-auto" for="autoRouting">
@@ -92,9 +105,9 @@
           <h2>Chats</h2>
           <div class="sidebar-actions">
             <Button icon="pi pi-plus" class="p-button-text" aria-label="New chat"
-              title="New chat" :disabled="!canOperate" @click="createNewChat" />
+              title="New chat" :disabled="!canOperate || isDeletingExchange" @click="createNewChat" />
             <Button icon="pi pi-refresh" class="p-button-text" aria-label="Refresh chats"
-              title="Refresh chats" :disabled="!canOperate || isLoading" @click="refreshSessions" />
+              title="Refresh chats" :disabled="!canOperate || isLoading || isDeletingExchange" @click="refreshSessions" />
           </div>
         </div>
         <div v-if="!sessions.length" class="sidebar-empty">No chats yet</div>
@@ -126,9 +139,11 @@
           :conversationId="selectedSession?.id || null"
           :currentMessages="responses"
           :contextName="autoRouting ? null : (contextName || '').trim() || null"
-          :isSending="isSending"
+          :isSending="isSending || isDeletingExchange"
+          :deletionDisabled="isSending || isLoadingChat || isDeletingExchange"
           @new-message="handleNewMessage"
           @download-image="downloadImage"
+          @delete-exchange="requestDeleteExchange"
         />
       </div>
     </div>
@@ -351,6 +366,11 @@ export default {
 
       isLoading: false,
       isSending: false,
+      isDeletingExchange: false,
+      showDeleteExchange: false,
+      deleteExchangeTarget: null,
+      deleteExchangeError: "",
+      historyRefreshError: "",
 
       sessions: [],
       selectedSession: null,
@@ -449,12 +469,52 @@ export default {
   },
 
   methods: {
+    _exchangeCorrelationId(message) {
+      // Lucy's incoming user event has exactly one execution correlation.
+      // Multiple associations are ambiguous; never select an arbitrary first ID.
+      if (message?.role !== "user" || message.kind !== "user_message" || !message.event_id) return null;
+      const ids = message.correlation_ids;
+      return Array.isArray(ids) && ids.length === 1 && typeof ids[0] === "string" && ids[0].trim()
+        ? ids[0] : null;
+    },
+
+    requestDeleteExchange(card) {
+      if (this.isSending || this.isLoadingChat || this.isDeletingExchange || !card?.exchangeCorrelationId) return;
+      if (card.sessionId !== this.selectedSession?.id || card.accountName !== this.accountName) return;
+      this.deleteExchangeTarget = { correlationId: card.exchangeCorrelationId,
+        sessionId: card.sessionId, accountName: card.accountName, service: this.dataService };
+      this.deleteExchangeError = "";
+      this.showDeleteExchange = true;
+    },
+
+    async confirmDeleteExchange() {
+      const target = this.deleteExchangeTarget;
+      if (!this.showDeleteExchange || !target || this.isSending || this.isLoadingChat || this.isDeletingExchange) return;
+      if (target.accountName !== this.accountName || target.sessionId !== this.selectedSession?.id || target.service !== this.dataService) {
+        this.deleteExchangeError = "The selected chat changed. Cancel and select the message again.";
+        return;
+      }
+      this.isDeletingExchange = true;
+      try {
+        await target.service.deactivateExchange(target.correlationId, target.sessionId, target.accountName);
+        const refreshed = await this.loadChat(target.sessionId);
+        this.showDeleteExchange = false;
+        this.deleteExchangeTarget = null;
+        if (!refreshed) this.historyRefreshError = "The exchange was removed, but history could not be refreshed. Refresh chats to see the result.";
+      } catch (error) {
+        this.deleteExchangeError = error.response?.data?.error || error.message || "Could not delete the exchange. Try again.";
+      } finally {
+        this.isDeletingExchange = false;
+      }
+    },
+
     toggleTheme() {
       this.store?.toggleTheme?.();
     },
 
     // --- Preferences ---
     openPrefs() {
+      if (this.isDeletingExchange) return;
       this.prefEndpoint = this.store?.serviceBaseUrl || "http://localhost:5000";
       this.prefApiKey = this.store?.apiKey || "";
       this.prefAccount = this.store?.accountName || "";
@@ -514,6 +574,7 @@ export default {
     },
 
     selectSession(session) {
+      if (this.isDeletingExchange) return;
       if (!session?.id || session.id === this.selectedSession?.id) return;
       this.selectedSession = session;
       if (this.store) this.store.setChatSessionId(session.id);
@@ -530,6 +591,7 @@ export default {
     },
 
     async refreshSessions({ loadMessages = true } = {}) {
+      if (this.isDeletingExchange) return;
       try {
         this.isLoading = true;
 
@@ -574,6 +636,15 @@ export default {
     // Message → card mapping (for chat display only — tool events are separate)
     // ------------------------------------------------------------------
     _mapMessageToCard(m, idx) {
+      const card = this._mapStoredMessageToCard(m, idx);
+      if (!card) return null;
+      return { ...card, id: m.event_id || card.id, event_id: m.event_id,
+        correlation_ids: Array.isArray(m.correlation_ids) ? [...m.correlation_ids] : [],
+        eventRole: m.role, exchangeCorrelationId: this._exchangeCorrelationId(m),
+        sessionId: m.session_id || this.selectedSession?.id, accountName: this.accountName };
+    },
+
+    _mapStoredMessageToCard(m, idx) {
       const agentName = m.actor || m.metadata?.agent ||
         (m.role !== "assistant" ? m.role : null) ||
         this.selectedAgent?.name || "assistant";
@@ -672,6 +743,8 @@ export default {
           const parsed = this._parseContent(m.content);
           const ts = m.utc_timestamp ? new Date(m.utc_timestamp).getTime() : Date.now();
           pendingChips.push({
+            event_id: m.event_id,
+            correlation_ids: Array.isArray(m.correlation_ids) ? [...m.correlation_ids] : [],
             call_id: (parsed && parsed.call_id) || `hist_${pendingChips.length}`,
             tool_name: (parsed && parsed.tool_name) || "unknown",
             status: "running",
@@ -683,6 +756,7 @@ export default {
 
           const chip = pendingChips.find(c => c.call_id === parsed.call_id);
           if (chip) {
+            chip.result_event_id = m.event_id;
             if (parsed.status && ["success", "warning", "error"].includes(parsed.status)) {
               chip.status = parsed.status;
             } else {
@@ -733,14 +807,24 @@ export default {
     // ------------------------------------------------------------------
     // Chat loading
     // ------------------------------------------------------------------
-    async loadChat(sessionId) {
+    async loadChat(sessionId, { completedQuestion = null, knownEventIds = [] } = {}) {
+      const accountName = this.accountName;
+      const service = this.dataService;
       try {
         if (!sessionId) return;
         this.isLoadingChat = true;
 
-        const chat = await this.dataService.getChat(sessionId, this.accountName);
+        const chat = await service.getChat(sessionId, accountName);
+        if (this.accountName !== accountName || this.dataService !== service ||
+            (this.selectedSession?.id && this.selectedSession.id !== sessionId)) return false;
         const agentName = chat.agent_name || this.requestAgentName || "lucy";
         const messages = chat.messages || [];
+        // Keep transient/unsaved responses when the server has no new persisted
+        // user event for this request. Reloaded cards always use stored IDs.
+        if (completedQuestion !== null && !messages.some(m => m.role === "user" &&
+            m.kind === "user_message" && m.content === completedQuestion && m.event_id &&
+            !knownEventIds.includes(m.event_id))) return false;
+        this.historyRefreshError = "";
 
         // Map messages to display cards (tool events → null, filtered out)
         const msgCards = messages
@@ -777,8 +861,11 @@ export default {
           ? msgCards
           : [{ id: "hello", role: agentName, content: "Hello! How can I help you?" }];
         await Promise.all([this._hydrateVideoCards(this.responses), this._hydrateImageCards(this.responses)]);
+        return true;
       } catch (error) {
         console.error("Error loading chat:", error);
+        this.historyRefreshError = "Could not refresh chat history. Please try Refresh chats.";
+        return false;
       } finally {
         this.isLoadingChat = false;
       }
@@ -792,6 +879,7 @@ export default {
     },
 
     async createNewChat() {
+      if (this.isDeletingExchange) return;
       try {
         if (!this.canOperate) return;
 
@@ -920,7 +1008,7 @@ export default {
     },
 
     async handleNewMessage(message) {
-      if (this.isSending) return;
+      if (this.isSending || this.isDeletingExchange) return;
       this.isSending = true;
       try {
         await this._sendMessage(message);
@@ -939,6 +1027,10 @@ export default {
         await new Promise(resolve => setTimeout(resolve, 25));
       }
 
+      const requestAccount = this.accountName;
+      const requestService = this.dataService;
+      const knownEventIds = this.responses.map(card => card.event_id).filter(Boolean);
+      let completed = false;
       let sessionId = this.selectedSession?.id;
 
       if (!sessionId) {
@@ -1172,6 +1264,7 @@ export default {
               break;
 
             case "done":
+              completed = true;
               assistantCard.isStreaming = false;
               this.selectedSession = {
                 ...this.selectedSession,
@@ -1187,7 +1280,13 @@ export default {
           }
         }
 
-        // Keep delivered inline images on screen; refresh only session metadata.
+        // Once persistence completes, rebuild from stored events so live messages
+        // acquire verified event/correlation IDs and related tool cards.
+        if (completed && this.selectedSession?.id === sessionId && this.accountName === requestAccount &&
+            this.dataService === requestService) {
+          await this.loadChat(sessionId, { completedQuestion: questionText, knownEventIds });
+        }
+        // Refresh session metadata without fetching the history again.
         await this.refreshSessions({ loadMessages: false });
       } catch (err) {
         console.error("Streaming ask failed:", err);

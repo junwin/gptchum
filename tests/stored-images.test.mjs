@@ -88,7 +88,7 @@ test('download errors appear on the image card', async () => {
 
 test('history mapping preserves stored URL and blob URLs are released', () => {
   const { methods, sandbox } = component();
-  const context = { _parseContent: JSON.parse, selectedAgent: { name: 'lucy' } };
+  const context = { ...methods, _parseContent: JSON.parse, selectedAgent: { name: 'lucy' } };
   const card = methods._mapMessageToCard.call(context, {
     kind: 'generated_image', content: JSON.stringify({ image_url: '/download/image/123', alt: 'A hill' })
   }, 0);

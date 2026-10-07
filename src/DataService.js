@@ -199,6 +199,16 @@ class DataService {
     }
   }
 
+  async deactivateExchange(correlationId, sessionId, accountName) {
+    if (![correlationId, sessionId, accountName].every(value => typeof value === "string" && value.trim())) {
+      throw new Error("correlationId, sessionId and accountName are required");
+    }
+    const response = await this.apiClient.delete(`/events/${encodeURIComponent(correlationId)}`, {
+      params: { accountName, sessionId },
+    });
+    return response.data;
+  }
+
   async getAgentNames() {
     try {
       const response = await this.apiClient.get("/agents");

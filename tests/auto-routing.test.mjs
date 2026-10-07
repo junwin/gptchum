@@ -66,7 +66,7 @@ test('auto send passes current account and labels the response with the routed s
     selectedAgent: { name: 'star' }, contextName: 'skinny', accountName: 'arla',
     selectedSession: { id: 'session' }, responses: [],
     $nextTick: async () => {}, refreshSessions: async () => {},
-    dataService: { async *askQuestionStreaming(...values) {
+    dataService: { getChat: async () => ({ messages: [] }), async *askQuestionStreaming(...values) {
       args = values;
       yield { type: 'action', action: 'request_routing', action_payload: { selected_agent: 'lumia' } };
       yield { type: 'text', content: 'Here is the image' };
