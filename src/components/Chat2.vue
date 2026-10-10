@@ -982,6 +982,29 @@ export default {
         .map(card => this._hydrateImageCard(card)));
     },
 
+    async downloadGeneratedFileCard(card) {
+      if (!card?.file_id || card.loading) return;
+      card.loading = true;
+      card.error = null;
+      try {
+        const blob = await this.dataService.downloadGeneratedFile(
+          card.file_id, card.accountName || this.accountName
+        );
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = card.download_name || "report.yaml";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (error) {
+        card.error = error.message || "Unable to download file";
+      } finally {
+        card.loading = false;
+      }
+    },
+
     async _hydrateVideoCard(card) {
       if (!card?.remote_url) {
         card.loading = false;
@@ -1226,6 +1249,22 @@ export default {
                 }));
                 if (added.created) await this._hydrateImageCard(added.card);
               }
+              break;
+            }
+
+            case "file": {
+              if (!event.file_id) break;
+              this.responses.push({
+                id: `file_${event.file_id}`,
+                kind: "file",
+                role: responseAgentName,
+                file_id: event.file_id,
+                mime_type: event.mime_type,
+                download_name: event.download_name || "report.yaml",
+                size_bytes: event.size_bytes,
+                accountName: this.accountName,
+                loading: false,
+              });
               break;
             }
 
