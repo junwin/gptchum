@@ -143,6 +143,7 @@
           :deletionDisabled="isSending || isLoadingChat || isDeletingExchange"
           @new-message="handleNewMessage"
           @download-image="downloadImage"
+          @download-file="downloadGeneratedFileCard"
           @delete-exchange="requestDeleteExchange"
         />
       </div>
