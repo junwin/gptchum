@@ -691,6 +691,19 @@ export default {
           });
         }
 
+        case "generated_file":
+          return {
+            id: m.event_id || m.utc_timestamp || `file_${idx}`,
+            role: agentName,
+            kind: "file",
+            file_id: parsed?.file_id,
+            mime_type: parsed?.mime_type || "application/octet-stream",
+            download_name: parsed?.download_name || "report.yaml",
+            size_bytes: parsed?.size_bytes,
+            accountName: this.accountName,
+            loading: false,
+          };
+
         case "generated_video":
           return {
             id: m.utc_timestamp || `vid_${idx}`,
