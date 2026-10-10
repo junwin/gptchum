@@ -85,6 +85,19 @@
           </div>
         </template>
 
+        <!-- Generated downloadable file -->
+        <template v-else-if="message.kind === 'file'">
+          <div class="generated-file-card">
+            <i class="pi pi-file" aria-hidden="true"></i>
+            <span>{{ message.download_name || 'Generated report' }}</span>
+            <button type="button" :disabled="message.loading || !message.file_id"
+              @click="$emit('download-file', message)">
+              {{ message.loading ? 'Downloading…' : 'Download' }}
+            </button>
+            <span v-if="message.error" class="error-badge">{{ message.error }}</span>
+          </div>
+        </template>
+
         <!-- Text card (default) -->
         <template v-else>
           <div class="participant-name">
@@ -475,6 +488,8 @@ export default {
   padding: 5px 10px;
 }
 
+.generated-file-card { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 12px; }
+.generated-file-card button { cursor: pointer; }
 /* Markdown output container */
 .card .message {
   width: 100%;
