@@ -50,6 +50,15 @@ class DataService {
     return response.json();
   }
 
+  async downloadGeneratedFile(fileId, accountName) {
+    if (!/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(fileId)) throw new Error("Invalid file ID");
+    const response = await this.apiClient.get(
+      `/download/file/${encodeURIComponent(fileId)}`,
+      { params: { accountName }, responseType: "blob" }
+    );
+    return response.data;
+  }
+
   async downloadVideo(videoUrl) {
     const key = this.apiKey || "";
     const headers = {};
