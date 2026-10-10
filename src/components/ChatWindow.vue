@@ -91,12 +91,21 @@
             {{ participantName(message) }}
             <button v-if="message.eventRole === 'user'" type="button" class="message-menu-button"
               aria-label="Message actions" aria-haspopup="menu" :aria-expanded="menuMessage === message"
-              :disabled="deletionDisabled || !message.exchangeCorrelationId"
+              :disabled="!message.exchangeCorrelationId"
               :title="message.exchangeCorrelationId ? 'Message actions' : 'Exchange identifier unavailable'"
               @click="openMessageMenu($event, message)">⋯</button>
             <span v-if="message.isStreaming" class="streaming-dots">
               <span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>
             </span>
+          </div>
+          <div v-if="displayedCorrelationMessage === message && message.exchangeCorrelationId"
+            class="correlation-display">
+            <span class="correlation-label">Correlation ID</span>
+            <input class="correlation-value" readonly aria-label="Correlation ID"
+              :value="message.exchangeCorrelationId" @focus="$event.target.select()" />
+            <button type="button" class="correlation-copy" @click="copyCorrelationId(message.exchangeCorrelationId)">
+              {{ copiedCorrelationId === message.exchangeCorrelationId ? 'Copied' : 'Copy' }}
+            </button>
           </div>
           <SafeMarkdown class="message" :source="message.content" />
           <div v-if="message.error" class="error-badge">Error</div>
@@ -237,7 +246,16 @@ export default {
   setup(props, { emit }) {
     const messageMenu = ref(null);
     const menuMessage = ref(null);
-    const messageMenuItems = computed(() => [{ label: "Delete exchange", icon: "pi pi-trash",
+    const displayedCorrelationMessage = ref(null);
+    const copiedCorrelationId = ref(null);
+    const messageMenuItems = computed(() => [{
+      label: "Display correlation id", icon: "pi pi-id-card",
+      disabled: !menuMessage.value?.exchangeCorrelationId,
+      command: () => {
+        displayedCorrelationMessage.value = menuMessage.value;
+        copiedCorrelationId.value = null;
+      },
+    }, { label: "Delete exchange", icon: "pi pi-trash",
       disabled: props.deletionDisabled || !menuMessage.value?.exchangeCorrelationId,
       command: () => {
         if (!props.deletionDisabled && menuMessage.value?.exchangeCorrelationId) {
@@ -246,12 +264,25 @@ export default {
       },
     }]);
     const openMessageMenu = (event, message) => {
-      if (props.deletionDisabled || !message.exchangeCorrelationId) return;
+      if (!message.exchangeCorrelationId) return;
       menuMessage.value = message;
       messageMenu.value.toggle(event);
     };
     watch(() => props.deletionDisabled, disabled => { if (disabled) messageMenu.value?.hide(); });
-    watch(() => props.currentMessages, () => messageMenu.value?.hide());
+    watch(() => props.currentMessages, () => {
+      messageMenu.value?.hide();
+      displayedCorrelationMessage.value = null;
+    });
+    const copyCorrelationId = async (id) => {
+      if (!id) return;
+      try {
+        await navigator.clipboard.writeText(id);
+        copiedCorrelationId.value = id;
+      } catch {
+        // The visible readonly input remains selectable when clipboard access is unavailable.
+        copiedCorrelationId.value = null;
+      }
+    };
     const inputText = ref("");
     const cardStack = ref(null);
     const fileInput = ref(null);
@@ -372,7 +403,7 @@ export default {
       () => scrollToBottom()
     );
 
-    return { messageMenu, menuMessage, messageMenuItems, openMessageMenu, inputText, cardStack, fileInput, attachments, sendMessage, openFilePicker, addFiles, removeAttachment, cardClass, isImageFile, chipClass, statusIcon, formatDuration, chipTitle, participantName };
+    return { messageMenu, menuMessage, messageMenuItems, openMessageMenu, displayedCorrelationMessage, copiedCorrelationId, copyCorrelationId, inputText, cardStack, fileInput, attachments, sendMessage, openFilePicker, addFiles, removeAttachment, cardClass, isImageFile, chipClass, statusIcon, formatDuration, chipTitle, participantName };
   },
 };
 </script>
@@ -423,6 +454,26 @@ export default {
 }
 .message-menu-button:focus-visible { outline: 2px solid var(--primary-color, #2563eb); }
 .message-menu-button:disabled { opacity: 0.4; cursor: default; }
+
+.correlation-display {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 10px;
+  font-size: 0.85rem;
+}
+.correlation-label { font-weight: 500; }
+.correlation-value {
+  flex: 1 1 260px;
+  min-width: 0;
+  padding: 5px 8px;
+  font: inherit;
+}
+.correlation-copy {
+  cursor: pointer;
+  padding: 5px 10px;
+}
 
 /* Markdown output container */
 .card .message {

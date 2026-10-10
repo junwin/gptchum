@@ -148,13 +148,19 @@ test('message menu works by ordinary activation and rechecks busy state', () => 
   ui.openMessageMenu({}, card);
   assert.equal(toggles, 1);
   ui.messageMenuItems.value[0].command();
+  assert.equal(ui.displayedCorrelationMessage.value, card);
+  assert.equal(events.length, 0);
+  ui.messageMenuItems.value[1].command();
   assert.equal(events[0][0], 'delete-exchange');
   assert.equal(events[0][1].exchangeCorrelationId, card.exchangeCorrelationId);
   props.deletionDisabled = true;
-  ui.messageMenuItems.value[0].command();
+  ui.messageMenuItems.value[1].command();
   ui.openMessageMenu({}, card);
   assert.equal(events.length, 1);
-  assert.equal(toggles, 1);
+  assert.equal(toggles, 2);
+  assert.equal(ui.messageMenuItems.value[0].disabled, false);
+  ui.openMessageMenu({}, { exchangeCorrelationId: null });
+  assert.equal(toggles, 2);
 });
 
 test('a completed stream refreshes stored targeting metadata before the next turn', async () => {
