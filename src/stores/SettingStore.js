@@ -7,6 +7,7 @@ const DEFAULT_BASE_URL = 'http://localhost:5000';
 
 const THEME_KEY = 'gptchum_theme';
 const AGENT_KEY = 'gptchum_agent';
+const AUTO_ROUTING_KEY = 'gptchum_auto_routing';
 const CONTEXT_KEY = 'gptchum_context';
 const API_KEY_KEY = 'gptchum_api_key';
 const BASE_URL_KEY = 'gptchum_base_url';
@@ -27,6 +28,15 @@ function applyThemeToDocument(theme) {
 function loadString(key, fallback = '') {
     try {
         return localStorage.getItem(key) || fallback;
+    } catch (e) {
+        return fallback;
+    }
+}
+
+function loadBoolean(key, fallback = false) {
+    try {
+        const value = localStorage.getItem(key);
+        return value === null ? fallback : value === 'true';
     } catch (e) {
         return fallback;
     }
@@ -64,6 +74,7 @@ export const useSettingStore = defineStore('settings', {
             serviceBaseUrl: savedBaseUrl,
             dataService: ds,
             agentName: loadString(AGENT_KEY, 'lucy'),
+            autoRouting: loadBoolean(AUTO_ROUTING_KEY, true),
             accountName: loadString(ACCOUNT_KEY),
             contextName: loadString(CONTEXT_KEY),
             apiKey: savedApiKey,
@@ -80,6 +91,9 @@ export const useSettingStore = defineStore('settings', {
         },
         getAgentName(state) {
             return state.agentName;
+        },
+        getAutoRouting(state) {
+            return state.autoRouting;
         },
         getAccountName(state) {
             return state.accountName;
@@ -107,6 +121,10 @@ export const useSettingStore = defineStore('settings', {
         setAgentName(newAgentName) {
             this.agentName = newAgentName || 'lucy';
             saveString(AGENT_KEY, this.agentName);
+        },
+        setAutoRouting(enabled) {
+            this.autoRouting = Boolean(enabled);
+            saveString(AUTO_ROUTING_KEY, this.autoRouting ? 'true' : 'false');
         },
         setAccountName(newAccountName) {
             this.accountName = newAccountName || '';

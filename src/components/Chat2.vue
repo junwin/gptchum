@@ -355,7 +355,7 @@ export default {
       responses: [{ id: "hello", role: "assistant", content: "Hello! How can I help you?" }],
       agents: [],
       selectedAgent: null,
-      autoRouting: false,
+      autoRouting: true,
       accountName: "",
 
       // Context
@@ -413,6 +413,7 @@ export default {
   async mounted() {
     this.store = useSettingStore();
     this.dataService = this.store.dataService;
+    this.autoRouting = this.store.getAutoRouting ?? true;
 
     this.selectedAgent = this.store.getAgentName ? { name: this.store.getAgentName } : null;
     this.accountName = this.store.getAccountName || "";
@@ -447,6 +448,10 @@ export default {
     selectedAgent(newAgent) {
       if (!newAgent) return;
       this.store.setAgentName(newAgent.name);
+    },
+
+    autoRouting(enabled) {
+      this.store?.setAutoRouting?.(enabled);
     },
 
     accountName(newName) {
