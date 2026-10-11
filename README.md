@@ -50,3 +50,14 @@ own deletion controls during a response. Other tabs/clients can still be running
 This change does not deploy the built client.
 
 Run the regression checks with `node --test tests/*.test.mjs` and `npm run build`.
+
+
+## Delete a session
+
+Use the ⋯ menu beside a chat's date details in the left sidebar, choose **Delete
+session**, and confirm. The current selected session cannot be deleted; switch
+to another chat first. Deletion is disabled while requests, history refreshes,
+or another deletion are running. The client calls Lucy's existing
+`DELETE /chats/<session_id>?accountName=…` endpoint. A successful deletion removes
+only that row and keeps the current conversation open. Failures retain the list
+and show an error for retry. Session history deletion cannot be undone.

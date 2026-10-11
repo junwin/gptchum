@@ -90,7 +90,20 @@
       <template #footer>
         <Button label="Cancel" class="p-button-text" :disabled="isDeletingExchange" @click="showDeleteExchange = false" />
         <Button :label="isDeletingExchange ? 'Deleting…' : 'Delete'" class="p-button-danger"
-          :disabled="isSending || isLoadingChat || isDeletingExchange" @click="confirmDeleteExchange" />
+          :disabled="isSending || isLoadingChat || isDeletingExchange || isDeletingSession" @click="confirmDeleteExchange" />
+      </template>
+    </Dialog>
+    <Menu ref="sessionMenu" :model="sessionMenuItems" :popup="true" @hide="menuSession = null" />
+    <Dialog v-model:visible="showDeleteSession" header="Delete session?" :modal="true"
+      :closable="!isDeletingSession" :closeOnEscape="!isDeletingSession"
+      :style="{ width: 'min(420px, calc(100vw - 2rem))' }">
+      <p>Delete “{{ deleteSessionTarget?.name }}” and its conversation history? This cannot be undone.</p>
+      <p v-if="deleteSessionError" role="alert">{{ deleteSessionError }}</p>
+      <template #footer>
+        <Button label="Cancel" class="p-button-text" :disabled="isDeletingSession" @click="showDeleteSession = false" />
+        <Button :label="isDeletingSession ? 'Deleting…' : 'Delete session'" class="p-button-danger"
+          :disabled="sessionDeletionBusy || deleteSessionTarget?.sessionId === selectedSession?.id"
+          @click="confirmDeleteSession" />
       </template>
     </Dialog>
     <p v-if="historyRefreshError" role="alert" class="history-error">{{ historyRefreshError }}</p>
@@ -105,23 +118,29 @@
           <h2>Chats</h2>
           <div class="sidebar-actions">
             <Button icon="pi pi-plus" class="p-button-text" aria-label="New chat"
-              title="New chat" :disabled="!canOperate || isDeletingExchange" @click="createNewChat" />
+              title="New chat" :disabled="!canOperate || isDeletingExchange || isDeletingSession" @click="createNewChat" />
             <Button icon="pi pi-refresh" class="p-button-text" aria-label="Refresh chats"
-              title="Refresh chats" :disabled="!canOperate || isLoading || isDeletingExchange" @click="refreshSessions" />
+              title="Refresh chats" :disabled="!canOperate || isLoading || isDeletingExchange || isDeletingSession" @click="refreshSessions" />
           </div>
         </div>
         <div v-if="!sessions.length" class="sidebar-empty">No chats yet</div>
         <div v-else class="session-list">
-          <button v-for="session in sessions" :key="session.id" type="button"
-            class="session-item" :class="{ active: selectedSession?.id === session.id }"
-            :aria-current="selectedSession?.id === session.id ? 'true' : undefined"
-            @click="selectSession(session)">
-            <span class="session-name">{{ session.friendly_name || session.id || '(unnamed)' }}</span>
-            <span class="session-meta">
-              <span v-if="session.message_count != null">{{ session.message_count }} msgs</span>
-              <span v-if="session.updated_at"> · {{ formatUpdated(session.updated_at) }}</span>
-            </span>
-          </button>
+          <div v-for="session in sessions" :key="session.id" class="session-item"
+            :class="{ active: selectedSession?.id === session.id }">
+            <button type="button" class="session-select"
+              :aria-current="selectedSession?.id === session.id ? 'true' : undefined"
+              :disabled="isDeletingSession" @click="selectSession(session)">
+              <span class="session-name">{{ session.friendly_name || session.id || '(unnamed)' }}</span>
+              <span class="session-meta">
+                <span v-if="session.message_count != null">{{ session.message_count }} msgs</span>
+                <span v-if="session.updated_at"> · {{ formatUpdated(session.updated_at) }}</span>
+              </span>
+            </button>
+            <button type="button" class="session-menu-button"
+              :aria-label="'Actions for ' + (session.friendly_name || session.id)"
+              aria-haspopup="menu" :disabled="sessionDeletionBusy"
+              @click.stop="openSessionMenu($event, session)">⋯</button>
+          </div>
         </div>
         <div class="sidebar-footer">
           <Button icon="pi pi-cog" class="p-button-text" aria-label="Preferences"
@@ -139,8 +158,8 @@
           :conversationId="selectedSession?.id || null"
           :currentMessages="responses"
           :contextName="autoRouting ? null : (contextName || '').trim() || null"
-          :isSending="isSending || isDeletingExchange"
-          :deletionDisabled="isSending || isLoadingChat || isDeletingExchange"
+          :isSending="isSending || isDeletingExchange || isDeletingSession"
+          :deletionDisabled="isSending || isLoadingChat || isDeletingExchange || isDeletingSession"
           @new-message="handleNewMessage"
           @download-image="downloadImage"
           @download-file="downloadGeneratedFileCard"
@@ -272,8 +291,8 @@
 
 .session-item {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  flex-direction: row;
+  align-items: flex-end;
   width: 100%;
   min-width: 0;
   padding: 0.6rem;
@@ -286,7 +305,7 @@
 }
 
 .session-item:hover,
-.session-item:focus-visible {
+.session-item:focus-within {
   background: var(--surface-hover, #e8e8e8);
 }
 
@@ -294,6 +313,34 @@
   background: var(--highlight-bg, #dbeafe);
   color: var(--highlight-text-color, inherit);
 }
+
+.session-select {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.session-menu-button {
+  flex: 0 0 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: inherit;
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+
+.session-menu-button:hover { background: var(--surface-hover, #e8e8e8); }
+.session-menu-button:disabled { opacity: 0.5; cursor: default; }
 
 .chat-content {
   flex: 1;
@@ -342,12 +389,13 @@
 </style>
 
 <script>
+import Menu from "primevue/menu";
 import ChatWindow from "./ChatWindow.vue";
 import { imageCard, addImageCard } from "../imageCards.js";
 import { useSettingStore } from "../stores/SettingStore.js";
 
 export default {
-  components: { ChatWindow },
+  components: { ChatWindow, Menu },
   name: "Chat2",
 
   data() {
@@ -373,6 +421,11 @@ export default {
       deleteExchangeError: "",
       historyRefreshError: "",
 
+      menuSession: null,
+      showDeleteSession: false,
+      isDeletingSession: false,
+      deleteSessionTarget: null,
+      deleteSessionError: "",
       sessions: [],
       selectedSession: null,
       sidebarOpen: true,
@@ -395,6 +448,14 @@ export default {
   },
 
   computed: {
+    sessionDeletionBusy() {
+      return this.isSending || this.isLoading || this.isLoadingChat || this.isDeletingExchange || this.isDeletingSession;
+    },
+    sessionMenuItems() {
+      return [{ label: "Delete session", icon: "pi pi-trash",
+        disabled: this.sessionDeletionBusy || !this.menuSession?.id || this.menuSession.id === this.selectedSession?.id,
+        command: () => this.requestDeleteSession(this.menuSession) }];
+    },
     requestAgentName() {
       return this.autoRouting ? "lucy" : this.selectedAgent?.name;
     },
@@ -475,6 +536,45 @@ export default {
   },
 
   methods: {
+    openSessionMenu(event, session) {
+      if (this.sessionDeletionBusy) return;
+      this.menuSession = session;
+      this.$refs.sessionMenu.toggle(event);
+    },
+
+    requestDeleteSession(session) {
+      if (this.sessionDeletionBusy || !session?.id || session.id === this.selectedSession?.id) return;
+      this.deleteSessionTarget = { sessionId: session.id, name: session.friendly_name || session.id,
+        accountName: this.accountName, service: this.dataService };
+      this.deleteSessionError = "";
+      this.showDeleteSession = true;
+    },
+
+    async confirmDeleteSession() {
+      const target = this.deleteSessionTarget;
+      if (!this.showDeleteSession || !target || this.sessionDeletionBusy) return;
+      if (target.sessionId === this.selectedSession?.id) {
+        this.deleteSessionError = "You cannot delete your current session. Switch to another chat first.";
+        return;
+      }
+      if (target.accountName !== this.accountName || target.service !== this.dataService) {
+        this.deleteSessionError = "The account or server changed. Cancel and select the session again.";
+        return;
+      }
+      this.isDeletingSession = true;
+      this.deleteSessionError = "";
+      try {
+        const result = await target.service.deleteChat(target.sessionId, target.accountName);
+        if (result?.ok !== true) throw new Error(result?.error || "Could not delete the session. Try again.");
+        this.sessions = this.sessions.filter(session => session.id !== target.sessionId);
+        this.showDeleteSession = false;
+        this.deleteSessionTarget = null;
+      } catch (error) {
+        this.deleteSessionError = error.response?.data?.error || error.message || "Could not delete the session. Try again.";
+      } finally {
+        this.isDeletingSession = false;
+      }
+    },
     _exchangeCorrelationId(message) {
       // Lucy's incoming user event has exactly one execution correlation.
       // Multiple associations are ambiguous; never select an arbitrary first ID.
@@ -485,7 +585,7 @@ export default {
     },
 
     requestDeleteExchange(card) {
-      if (this.isSending || this.isLoadingChat || this.isDeletingExchange || !card?.exchangeCorrelationId) return;
+      if (this.isSending || this.isLoadingChat || this.isDeletingExchange || this.isDeletingSession || !card?.exchangeCorrelationId) return;
       if (card.sessionId !== this.selectedSession?.id || card.accountName !== this.accountName) return;
       this.deleteExchangeTarget = { correlationId: card.exchangeCorrelationId,
         sessionId: card.sessionId, accountName: card.accountName, service: this.dataService };
@@ -495,7 +595,7 @@ export default {
 
     async confirmDeleteExchange() {
       const target = this.deleteExchangeTarget;
-      if (!this.showDeleteExchange || !target || this.isSending || this.isLoadingChat || this.isDeletingExchange) return;
+      if (!this.showDeleteExchange || !target || this.isSending || this.isLoadingChat || this.isDeletingExchange || this.isDeletingSession) return;
       if (target.accountName !== this.accountName || target.sessionId !== this.selectedSession?.id || target.service !== this.dataService) {
         this.deleteExchangeError = "The selected chat changed. Cancel and select the message again.";
         return;
@@ -520,7 +620,7 @@ export default {
 
     // --- Preferences ---
     openPrefs() {
-      if (this.isDeletingExchange) return;
+      if (this.isDeletingExchange || this.isDeletingSession) return;
       this.prefEndpoint = this.store?.serviceBaseUrl || "http://localhost:5000";
       this.prefApiKey = this.store?.apiKey || "";
       this.prefAccount = this.store?.accountName || "";
@@ -528,6 +628,7 @@ export default {
     },
 
     savePrefs() {
+      if (this.isDeletingSession) return;
       // Both setters keep DataService in sync with the saved connection settings.
       if (this.store) {
         this.store.setApiKey(this.prefApiKey);
@@ -580,7 +681,7 @@ export default {
     },
 
     selectSession(session) {
-      if (this.isDeletingExchange) return;
+      if (this.isDeletingExchange || this.isDeletingSession) return;
       if (!session?.id || session.id === this.selectedSession?.id) return;
       this.selectedSession = session;
       if (this.store) this.store.setChatSessionId(session.id);
@@ -597,7 +698,7 @@ export default {
     },
 
     async refreshSessions({ loadMessages = true } = {}) {
-      if (this.isDeletingExchange) return;
+      if (this.isDeletingExchange || this.isDeletingSession) return;
       try {
         this.isLoading = true;
 
@@ -898,7 +999,7 @@ export default {
     },
 
     async createNewChat() {
-      if (this.isDeletingExchange) return;
+      if (this.isDeletingExchange || this.isDeletingSession) return;
       try {
         if (!this.canOperate) return;
 
@@ -1050,7 +1151,7 @@ export default {
     },
 
     async handleNewMessage(message) {
-      if (this.isSending || this.isDeletingExchange) return;
+      if (this.isSending || this.isDeletingExchange || this.isDeletingSession) return;
       this.isSending = true;
       try {
         await this._sendMessage(message);
@@ -1358,3 +1459,4 @@ export default {
   },
 };
 </script>
+

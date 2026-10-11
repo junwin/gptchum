@@ -208,6 +208,16 @@ class DataService {
     }
   }
 
+  async deleteChat(sessionId, accountName) {
+    if (![sessionId, accountName].every(value => typeof value === "string" && value.trim())) {
+      throw new Error("sessionId and accountName are required");
+    }
+    const response = await this.apiClient.delete(`/chats/${encodeURIComponent(sessionId)}`, {
+      params: { accountName },
+    });
+    return response.data;
+  }
+
   async deactivateExchange(correlationId, sessionId, accountName) {
     if (![correlationId, sessionId, accountName].every(value => typeof value === "string" && value.trim())) {
       throw new Error("correlationId, sessionId and accountName are required");
@@ -250,3 +260,4 @@ class DataService {
 }
 
 export default DataService;
+

@@ -148,7 +148,7 @@ test('message menu works by ordinary activation and rechecks busy state', () => 
   ui.openMessageMenu({}, card);
   assert.equal(toggles, 1);
   ui.messageMenuItems.value[0].command();
-  assert.equal(ui.displayedCorrelationMessage.value, card);
+  assert.deepEqual(ui.displayedCorrelationMessage.value, card); // Vue refs wrap objects in a reactive proxy
   assert.equal(events.length, 0);
   ui.messageMenuItems.value[1].command();
   assert.equal(events[0][0], 'delete-exchange');
@@ -186,3 +186,4 @@ test('a completed stream refreshes stored targeting metadata before the next tur
   assert.equal(s.responses[0].exchangeCorrelationId, 'exchange-one');
   assert.equal(s.isSending, false);
 });
+

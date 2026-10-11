@@ -16,7 +16,7 @@ function component() {
   const source = fs.readFileSync(new URL('../src/components/Chat2.vue', import.meta.url), 'utf8');
   const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
     .replace(/^import .*;\s*$/gm, '').replace('export default', 'module.exports =');
-  const sandbox = { module: {}, ChatWindow: {}, useSettingStore: () => ({}), imageCard, addImageCard, console };
+  const sandbox = { module: {}, ChatWindow: {}, Menu: {}, useSettingStore: () => ({}), imageCard, addImageCard, console };
   vm.runInNewContext(script, sandbox);
   return sandbox.module.exports;
 }
@@ -159,3 +159,4 @@ test('chat history requires an account before sending the request', async () => 
   }
   assert.equal(calls, 0);
 });
+
