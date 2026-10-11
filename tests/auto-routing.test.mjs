@@ -68,11 +68,8 @@ test('auto toggle is saved through the settings store watcher', () => {
 
 test('auto preference defaults on and survives settings store recreation', () => {
   const source = fs.readFileSync(new URL('../src/stores/SettingStore.js', import.meta.url), 'utf8')
-    .replace(/^import .*;\\s*$/gm, '')
-    .replace("export const useSettingStore = defineStore('settings', {", "const useSettingStore = defineStore('settings', {")
-    .replace(/\\n\\s*\\/\\* end store \\*\\/\\s*$/, '');
-  const wrapped = source + '\\nmodule.exports = useSettingStore;';
-  const storage = new Map();
+    .replace(/^import .*;\s*$/gm, '')
+    .replace("export const useSettingStore = defineStore('settings', {", "const useSettingStore = defineStore('settings', {");
   const sandbox = {
     module: {},
     process: { env: { NODE_ENV: 'test' } },
@@ -85,15 +82,17 @@ test('auto preference defaults on and survives settings store recreation', () =>
     },
     document: { documentElement: { classList: { add() {}, remove() {} } } },
   };
-  vm.runInNewContext(wrapped, sandbox);
+  const storage = new Map();
+  vm.runInNewContext(source + '\nmodule.exports = useSettingStore;', sandbox);
   const store = sandbox.module.exports;
   const firstRun = store.state();
   assert.equal(firstRun.autoRouting, true);
   store.actions.setAutoRouting.call(firstRun, false);
   assert.equal(storage.get('gptchum_auto_routing'), 'false');
   assert.equal(store.state().autoRouting, false);
+  store.actions.setAutoRouting.call(firstRun, true);
+  assert.equal(storage.get('gptchum_auto_routing'), 'true');
 });
-
 test('auto send passes current account and labels the response with the routed specialist', async () => {
   const c = component();
   let args;
