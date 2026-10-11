@@ -15,7 +15,7 @@ function component() {
   const source = fs.readFileSync(new URL('../src/components/Chat2.vue', import.meta.url), 'utf8');
   const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
     .replace(/^import .*;\s*$/gm, '').replace('export default', 'module.exports =');
-  const sandbox = { module: {}, ChatWindow: {}, useSettingStore: () => ({}),
+  const sandbox = { module: {}, ChatWindow: {}, Menu: {}, useSettingStore: () => ({}),
     imageCard, addImageCard,
     URL: { createObjectURL: () => 'blob:stored-image', revokeObjectURL: () => {} }, console };
   vm.runInNewContext(script, sandbox);
@@ -99,3 +99,4 @@ test('history mapping preserves stored URL and blob URLs are released', () => {
   methods._releaseMediaUrls.call({}, [{ kind: 'image', image_url: 'blob:old' }]);
   assert.equal(revoked, 'blob:old');
 });
+
