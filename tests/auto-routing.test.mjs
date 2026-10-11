@@ -46,16 +46,52 @@ for (const auto of [false, true]) {
   });
 }
 
-test('auto starts unchecked and switching it off restores the manual agent', () => {
+test('auto starts checked and switching it off restores the manual agent', () => {
   const c = component();
   const state = c.data();
-  assert.equal(state.autoRouting, false);
+  assert.equal(state.autoRouting, true);
   state.selectedAgent = { name: 'star' };
-  assert.equal(c.computed.requestAgentName.call(state), 'star');
-  state.autoRouting = true;
   assert.equal(c.computed.requestAgentName.call(state), 'lucy');
   state.autoRouting = false;
   assert.equal(c.computed.requestAgentName.call(state), 'star');
+  state.autoRouting = true;
+  assert.equal(c.computed.requestAgentName.call(state), 'lucy');
+});
+
+test('auto toggle is saved through the settings store watcher', () => {
+  const c = component();
+  const saved = [];
+  c.watch.autoRouting.call({ store: { setAutoRouting: value => saved.push(value) } }, false);
+  c.watch.autoRouting.call({ store: { setAutoRouting: value => saved.push(value) } }, true);
+  assert.deepEqual(saved, [false, true]);
+});
+
+test('auto preference defaults on and survives settings store recreation', () => {
+  const source = fs.readFileSync(new URL('../src/stores/SettingStore.js', import.meta.url), 'utf8')
+    .replace(/^import .*;\\s*$/gm, '')
+    .replace("export const useSettingStore = defineStore('settings', {", "const useSettingStore = defineStore('settings', {")
+    .replace(/\\n\\s*\\/\\* end store \\*\\/\\s*$/, '');
+  const wrapped = source + '\\nmodule.exports = useSettingStore;';
+  const storage = new Map();
+  const sandbox = {
+    module: {},
+    process: { env: { NODE_ENV: 'test' } },
+    DataService: class { constructor() {} },
+    defineStore: (_name, options) => options,
+    localStorage: {
+      getItem: key => storage.has(key) ? storage.get(key) : null,
+      setItem: (key, value) => storage.set(key, value),
+      removeItem: key => storage.delete(key),
+    },
+    document: { documentElement: { classList: { add() {}, remove() {} } } },
+  };
+  vm.runInNewContext(wrapped, sandbox);
+  const store = sandbox.module.exports;
+  const firstRun = store.state();
+  assert.equal(firstRun.autoRouting, true);
+  store.actions.setAutoRouting.call(firstRun, false);
+  assert.equal(storage.get('gptchum_auto_routing'), 'false');
+  assert.equal(store.state().autoRouting, false);
 });
 
 test('auto send passes current account and labels the response with the routed specialist', async () => {
