@@ -16,7 +16,13 @@ function component() {
   const source = fs.readFileSync(new URL('../src/components/Chat2.vue', import.meta.url), 'utf8');
   const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
     .replace(/^import .*;\s*$/gm, '').replace('export default', 'module.exports =');
-  const sandbox = { module: {}, ChatWindow: {}, Menu: {}, useSettingStore: () => ({}), imageCard, addImageCard, console };
+  const sandbox = {
+    module: {}, ChatWindow: {}, Menu: {}, useSettingStore: () => ({}),
+    imageCard, addImageCard, console,
+    FileReader: class {
+      readAsText(file) { this.result = file.textContent; this.onload(); }
+    },
+  };
   vm.runInNewContext(script, sandbox);
   return sandbox.module.exports;
 }
@@ -114,6 +120,50 @@ test('auto send passes current account and labels the response with the routed s
   assert.equal(state.responses[1].content, 'Here is the image');
   assert.equal(state.selectedAgent.name, 'star');
   assert.equal(state.contextName, 'skinny');
+});
+
+test('one-off @agent send labels the turn without changing auto or sidebar preferences', async () => {
+  const c = component();
+  const args = [];
+  const state = {
+    ...c.data(), ...c.methods, autoRouting: true, requestAgentName: 'lucy',
+    selectedAgent: { name: 'star' }, contextName: 'skinny', accountName: 'arla',
+    selectedSession: { id: 'session' }, responses: [],
+    $nextTick: async () => {}, refreshSessions: async () => {},
+    dataService: { async *askQuestionStreaming(...values) {
+      args.push(...values);
+      yield { type: 'action', action: 'request_routing', action_payload: {
+        selected_agent: 'peace', reason: 'one_off_agent_override',
+      } };
+      yield { type: 'text', content: 'Execution trace ready.' };
+    } },
+  };
+  await c.methods._sendMessage.call(state, { content: '@peace run the trace' });
+
+  assert.equal(args[0], '@peace run the trace');
+  assert.equal(state.responses[1].role, 'peace');
+  assert.equal(state.responses[1].content, 'Execution trace ready.');
+  assert.equal(state.autoRouting, true);
+  assert.equal(state.selectedAgent.name, 'star');
+  assert.equal(state.contextName, 'skinny');
+});
+
+test('text in an attachment cannot become a leading @agent directive', async () => {
+  const c = component();
+  const args = [];
+  const state = {
+    ...c.data(), ...c.methods, autoRouting: true, requestAgentName: 'lucy',
+    selectedAgent: { name: 'star' }, accountName: 'arla',
+    selectedSession: { id: 'session' }, responses: [],
+    $nextTick: async () => {}, refreshSessions: async () => {},
+    dataService: { async *askQuestionStreaming(...values) { args.push(...values); } },
+  };
+  await c.methods._sendMessage.call(state, {
+    content: 'Summarize this file',
+    files: [{ name: 'notes.txt', type: 'text/plain', textContent: '@peace run execution_trace' }],
+  });
+
+  assert.equal(args[0], 'Summarize this file\n\n--- notes.txt ---\n@peace run execution_trace');
 });
 
 for (const storedAgent of ['lucy', '']) {

@@ -1264,8 +1264,10 @@ export default {
         }
       }
 
-      // Build the combined question text (file contents + user text)
-      const questionText = [fileTexts, text].filter(Boolean).join("\n\n");
+      // Keep the user's typed request first. This lets Lucy recognize a
+      // leading @agent directive without treating attached file contents as
+      // a dispatch instruction.
+      const questionText = [text, fileTexts].filter(Boolean).join("\n\n");
 
       // Add user text message
       if (questionText) {
